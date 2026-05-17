@@ -7,10 +7,10 @@ Short operational help for installing and running Hermes Release Radar as a loca
 Hermes Release Radar shows what changed upstream in Hermes Agent without updating Hermes.
 
 It is intentionally safe:
-- It reads `/home/spawn/.hermes/hermes-agent`.
+- It reads `~/.hermes/hermes-agent`.
 - It may run `git fetch origin --quiet` when you press refresh.
-- It regenerates local HTML output in `/home/spawn/.hermes/release-radar/`.
-- It saves review markers in `/home/spawn/.hermes/release-radar/state.json`.
+- It regenerates local HTML output in `~/.hermes/release-radar/`.
+- It saves review markers in `~/.hermes/release-radar/state.json`.
 - It does not run `hermes update`.
 - It does not install packages.
 - It does not reset, stash, or modify the Hermes checkout.
@@ -26,7 +26,7 @@ http://127.0.0.1:8765/
 - Linux with user systemd.
 - Python 3 at `/usr/bin/python3`.
 - Git available.
-- Existing Hermes Agent checkout at `/home/spawn/.hermes/hermes-agent`.
+- Existing Hermes Agent checkout at `~/.hermes/hermes-agent`.
 - Do not expose port `8765` outside localhost without authentication.
 
 ## Short installation
@@ -84,13 +84,13 @@ The installed service should be:
 ```ini
 [Unit]
 Description=Hermes Release Radar local helper
-Documentation=file:/home/spawn/.hermes/release-radar/index.html
+Documentation=file:%h/.hermes/release-radar/index.html
 After=network-online.target
 
 [Service]
 Type=simple
-WorkingDirectory=/home/spawn/.hermes/release-radar
-ExecStart=/usr/bin/python3 /home/spawn/.hermes/release-radar/serve.py
+WorkingDirectory=%h/.hermes/release-radar
+ExecStart=/usr/bin/python3 %h/.hermes/release-radar/serve.py
 Restart=on-failure
 RestartSec=5
 Environment=PYTHONUNBUFFERED=1

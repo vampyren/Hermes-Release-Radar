@@ -3,8 +3,9 @@ from pathlib import Path
 import html
 import re
 
-src = Path('/home/spawn/.hermes/release-radar/HELP.md')
-out_path = Path('/home/spawn/.hermes/release-radar/help.html')
+repo_root = Path(__file__).resolve().parents[1]
+src = repo_root / 'HELP.md'
+out_path = repo_root / 'docs' / 'help.html'
 md = src.read_text(encoding='utf-8')
 
 parts = []

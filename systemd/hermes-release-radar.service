@@ -1,12 +1,12 @@
 [Unit]
 Description=Hermes Release Radar local helper
-Documentation=file:/home/spawn/.hermes/release-radar/index.html
+Documentation=file:%h/.hermes/release-radar/index.html
 After=network-online.target
 
 [Service]
 Type=simple
-WorkingDirectory=/home/spawn/.hermes/release-radar
-ExecStart=/usr/bin/python3 /home/spawn/.hermes/release-radar/serve.py
+WorkingDirectory=%h/.hermes/release-radar
+ExecStart=/usr/bin/python3 %h/.hermes/release-radar/serve.py
 Restart=on-failure
 RestartSec=5
 Environment=PYTHONUNBUFFERED=1
