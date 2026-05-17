@@ -4,6 +4,8 @@ Hermes Release Radar is a local, safe update-intelligence page for Hermes Agent.
 
 It answers: what changed upstream since the Hermes checkout I am running now, and what actually matters?
 
+Current project version: `0.2.7-ui`.
+
 ## Current local URL
 
 ```text
@@ -89,10 +91,32 @@ src/generate.py                         Static page generator
 src/serve.py                            Local-only helper server
 systemd/hermes-release-radar.service    User systemd service
 docs/help.html                          Rendered help page
+docs/RELEASE_LOG.md                     Public project changelog
 scripts/render_help.py                  Markdown-to-help HTML renderer
 HELP.md                                 Operator help
 README.md                               Project overview
 PURPOSE.md                              Project purpose and principles
+VERSION                                 Current project version
+```
+
+## Versioning and releases
+
+Release Radar uses semantic-ish project versions separate from Hermes Agent versions.
+
+- Major: architecture or safety-model changes.
+- Minor: user-facing features, generated page structure changes, helper API changes, or state-model additions.
+- Patch/suffix: UI polish, docs, correctness fixes, or reliability improvements.
+
+Git tags use the current project version with a leading `v`, for example `v0.2.7-ui`.
+
+Release checklist:
+
+```bash
+python3 -m py_compile src/generate.py src/serve.py scripts/render_help.py
+git status --short --branch
+git tag -a vX.Y.Z-suffix -m "vX.Y.Z-suffix"
+git push origin vX.Y.Z-suffix
+gh release create vX.Y.Z-suffix --title "vX.Y.Z-suffix" --notes-file /tmp/release-notes.md
 ```
 
 ## Verification

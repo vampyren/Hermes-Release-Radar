@@ -1,5 +1,13 @@
 # Release Log
 
+## 0.2.7-ui - 2026-05-17
+
+- Added original self-contained SVG app icon to the top-left page brand.
+- Added the same icon as a local SVG favicon data URI.
+- Applied branding consistently to the current page and history page.
+- Removed default link underline from the app title for a more polished app feel.
+- Added `VERSION` and documented the release/tagging workflow.
+
 ## 0.2.6-docs-ui - 2026-05-17
 
 - Added operator help page as `HELP.md` and rendered `docs/help.html`.
