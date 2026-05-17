@@ -1,6 +1,6 @@
 # Release Log
 
-## Unreleased
+## 0.4.0-local - 2026-05-17
 
 - Removed the separate public GitHub Pages demo path to keep one generator and avoid drift.
 - Deleted the public demo generator, generated public artifacts, and public rebuild workflow.
