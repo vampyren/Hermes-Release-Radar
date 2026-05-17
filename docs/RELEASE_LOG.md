@@ -1,5 +1,10 @@
 # Release Log
 
+## Unreleased
+
+- Planned a separate GitHub Pages/public demo mode with GitHub Actions auto-regeneration.
+- Documented the hard separation between public static output and Rex's private local state/runtime.
+
 ## 0.2.8-docs - 2026-05-17
 
 - Added README screenshots for the `What actually matters` and raw categorized commits views.
