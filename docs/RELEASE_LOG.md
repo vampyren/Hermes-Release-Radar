@@ -1,0 +1,24 @@
+# Release Log
+
+## 0.2.6-docs-ui - 2026-05-17
+
+- Added operator help page as `HELP.md` and rendered `docs/help.html`.
+- Added top-nav `?` help link in the generated radar page.
+- Fixed auto-status detection so marker rendering cannot block `/api/status` checks when a legacy marker lacks a commit value.
+- Restyled help command blocks to avoid nested boxes.
+- Added copy buttons and wrapped long install commands with continuation lines.
+- Prepared the public repository layout with source, systemd unit, docs, and helper scripts.
+
+## 0.2.5-correctness - 2026-05-17
+
+- Made Official release notes and What Actually Matters range-correct against `HEAD..origin/main`.
+- Prevented already-installed release bodies from appearing as pending update information.
+- Reduced client-side state embedded in `index.html`.
+
+## 0.2.0 - 2026-05-17
+
+- Added local helper service and durable server-side marker state.
+
+## 0.1.0 - 2026-05-16
+
+- Built static Release Radar MVP.
