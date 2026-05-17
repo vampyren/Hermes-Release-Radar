@@ -19,7 +19,7 @@ import os
 import subprocess
 from pathlib import Path
 
-ROOT = Path(os.environ.get("RELEASE_RADAR_ROOT", Path(__file__).resolve().parent)).expanduser()
+ROOT = Path(os.environ.get("RELEASE_RADAR_ROOT", Path.home() / ".hermes" / "release-radar")).expanduser()
 REPO = Path(os.environ.get("RELEASE_RADAR_HERMES_REPO", Path.home() / ".hermes" / "hermes-agent")).expanduser()
 GENERATE = ROOT / "generate.py"
 STATE_PATH = ROOT / "state.json"
