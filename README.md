@@ -4,7 +4,7 @@ Hermes Release Radar is a local, safe update-intelligence page for Hermes Agent.
 
 It answers: what changed upstream since the Hermes checkout I am running now, and what actually matters?
 
-Current project version: `0.2.7-ui`.
+Current project version: `0.2.8-docs`.
 
 ## Current local URL
 
@@ -23,6 +23,20 @@ http://127.0.0.1:8765/
   - Durable review markers stored in `state.json`.
   - Installed-update history once Hermes actually advances.
 - Runs as a local-only helper service on `127.0.0.1:8765`.
+
+## Screenshots
+
+### What actually matters
+
+Human-readable impact cards summarize the important change clusters first, with representative commits still visible for auditability.
+
+![What actually matters view](docs/assets/screenshots/what-actually-matters.png)
+
+### Raw categorized commits
+
+The raw view keeps the full commit trail grouped by category, with review markers and safety notes available in the same page.
+
+![Raw categorized commits view](docs/assets/screenshots/raw-categorized-commits.png)
 
 ## Safety contract
 

@@ -1,5 +1,11 @@
 # Release Log
 
+## 0.2.8-docs - 2026-05-17
+
+- Added README screenshots for the `What actually matters` and raw categorized commits views.
+- Sanitized screenshot paths so public images show generic `~/.hermes/...` paths instead of local machine paths.
+- Rewrote `#matters` card intro text to describe the feature/change directly instead of repeating `This matters because`.
+
 ## 0.2.7-ui - 2026-05-17
 
 - Added original self-contained SVG app icon to the top-left page brand.
