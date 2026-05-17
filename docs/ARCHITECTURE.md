@@ -10,17 +10,17 @@
 - `help.html`: operator help page.
 - `systemd/hermes-release-radar.service`: user service unit.
 
-## Planned public GitHub Pages mode
+## Public GitHub Pages mode
 
-GitHub Pages should be a separate public/demo build path, not the local Rex workflow.
+GitHub Pages is a separate public/demo build path, not the local Rex workflow.
 
-Intended shape:
+Implemented shape:
 
-- Public output lives under a dedicated generated folder such as `public/` or `docs/public/`.
-- GitHub Actions runs on a schedule and on manual dispatch.
-- The workflow checks out/fetches public Hermes Agent data, runs a public-mode generator, and commits generated static files only when content changes.
-- The generated public page must not include helper API controls, local service status, local filesystem paths, Rex's `state.json`, review markers, or installed-checkout-specific claims.
-- The public page should warn clearly: this is a public static demo. To compare your own installed Hermes checkout and track your own review markers, run Release Radar locally.
+- Public output lives under `public/`.
+- `src/generate_public.py` reads only a public Hermes Agent git checkout plus public GitHub release metadata.
+- `.github/workflows/public-pages.yml` runs on a schedule and manual dispatch, regenerates `public/index.html` and `public/snapshot.json`, privacy-scans them, commits only those public artifacts when they change, and deploys the `public/` artifact to GitHub Pages.
+- The public page excludes helper API controls, local service status, local filesystem paths, Rex's `state.json`, review markers, and installed-checkout-specific claims.
+- The public page warns clearly: it is a public static demo. To compare your own installed Hermes checkout and track your own review markers, run Release Radar locally.
 - Local mode remains the canonical personal workflow and stays bound to `127.0.0.1`.
 
 ## Data flow

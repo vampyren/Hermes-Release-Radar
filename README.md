@@ -4,13 +4,19 @@ Hermes Release Radar is a local, safe update-intelligence page for Hermes Agent.
 
 It answers: what changed upstream since the Hermes checkout I am running now, and what actually matters?
 
-Current project version: `0.2.8-docs`.
+Current project version: `0.3.0-public`.
 
 ## Current local URL
 
 ```text
 http://127.0.0.1:8765/
 ```
+
+## Public demo vs local mode
+
+The GitHub Pages/public demo is a separate static build under `public/`. It uses only public Hermes Agent repository data and is safe to publish.
+
+The public demo does not know what you have installed, does not persist review markers, does not call the local helper API, and does not provide personalized update advice. Run Release Radar locally for installed-vs-upstream comparison, marker persistence, local modified-file checks, and update decisions.
 
 ## What it does
 
@@ -101,16 +107,20 @@ curl -s -X POST http://127.0.0.1:8765/api/refresh
 ## Repository layout
 
 ```text
-src/generate.py                         Static page generator
-src/serve.py                            Local-only helper server
-systemd/hermes-release-radar.service    User systemd service
-docs/help.html                          Rendered help page
-docs/RELEASE_LOG.md                     Public project changelog
-scripts/render_help.py                  Markdown-to-help HTML renderer
-HELP.md                                 Operator help
-README.md                               Project overview
-PURPOSE.md                              Project purpose and principles
-VERSION                                 Current project version
+.github/workflows/public-pages.yml       Scheduled/manual public demo rebuild
+src/generate.py                          Local private page generator
+src/generate_public.py                   Public GitHub Pages/demo generator
+src/serve.py                             Local-only helper server
+systemd/hermes-release-radar.service     User systemd service
+public/index.html                        Generated public demo page
+public/snapshot.json                     Generated public demo data snapshot
+docs/help.html                           Rendered help page
+docs/RELEASE_LOG.md                      Public project changelog
+scripts/render_help.py                   Markdown-to-help HTML renderer
+HELP.md                                  Operator help
+README.md                                Project overview
+PURPOSE.md                               Project purpose and principles
+VERSION                                  Current project version
 ```
 
 ## Versioning and releases

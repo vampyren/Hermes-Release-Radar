@@ -2,8 +2,14 @@
 
 ## Unreleased
 
-- Planned a separate GitHub Pages/public demo mode with GitHub Actions auto-regeneration.
-- Documented the hard separation between public static output and Rex's private local state/runtime.
+- Nothing yet.
+
+## 0.3.0-public - 2026-05-17
+
+- Implemented `src/generate_public.py` as a separate GitHub Pages/static demo generator.
+- Added `public/index.html` and `public/snapshot.json` as public-only generated artifacts.
+- Added a scheduled/manual GitHub Actions workflow that regenerates, privacy-scans, commits, and deploys public artifacts.
+- Documented public demo vs local mode warnings in README and architecture docs.
 
 ## 0.2.8-docs - 2026-05-17
 

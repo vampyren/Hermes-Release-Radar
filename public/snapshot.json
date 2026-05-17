@@ -1,0 +1,4144 @@
+{
+  "generated_at": "2026-05-17T14:33:48Z",
+  "upstream": "f36c89cd5798da0f313192555739975e57ffdef5",
+  "latest_release": {
+    "name": "Hermes Agent v0.14.0 (2026.5.16)",
+    "tag_name": "v2026.5.16",
+    "html_url": "https://github.com/NousResearch/hermes-agent/releases/tag/v2026.5.16",
+    "published_at": "2026-05-16T09:59:15Z",
+    "body_excerpt": "# Hermes Agent v0.14.0 (v2026.5.16)\n\n**Release Date:** May 16, 2026\n**Since v0.13.0:** 808 commits · 633 merged PRs · 1393 files changed · 165,061 insertions · 545 issues closed (12 P0, 50 P1) · 215 community contributors (including co-authors)\n\n> The Foundation Release — Hermes installs and runs anywhere, ships with the things you actually want to use, and stops shipping the things you don't. xAI Grok lands as a SuperGrok OAuth provider with grok-4.3 bumped to a 1M context window. A new OpenAI-compatible local proxy turns any OAuth-authed Hermes provider — Claude Pro, ChatGPT Pro, SuperGrok — into an endpoint that Codex / Aider / Cline / Continue can hit. `x_search` lands as a first-class X (Twitter) search tool with OAuth-or-API-key auth. The Microsoft Teams stack is wired end-to-end (Graph auth + webhook listener + pipeline runtime + outbound delivery). A debloating wave makes installs dramatically lighter — heavyweight backends now lazy-install on first use, the `[all]` extras drop everything covered by lazy-deps, and a tiered install falls back when a wheel rejects on your platform. `pip install hermes-agent` works from PyPI. The cold-start wave shaves ~19 seconds off `hermes` launch. Browser CDP calls are 180x faster. Two new messaging platforms (LINE + SimpleX Chat) bring the total to 22. Cross-session 1-hour Claude prompt caching, `/handoff` that actually transfers sessions live, native button UI for `clarify` on Telegram and Discord, Discord channel history backfill, LSP semantic diagnostics on every write, a unified pluggable `video_generate`, a `computer_use` cua-driver backend that finally works with non-Anthropic providers, clickable URLs in any terminal, Zed ACP Registry integration via `uvx`, native Windows beta, 9 new optional skills, OpenRouter Pareto C",
+    "highlights": [
+      {
+        "title": "xAI Grok via SuperGrok OAuth — and grok-4.3 jumps to a 1M context window",
+        "text": "If you pay for SuperGrok, you can now use Grok inside Hermes by signing in with your xAI account — no API key, no separate billing. The wire-through also bumps grok-4.3 to a 1M token context window, so you can drop whole codebases or research corpora into a single prompt. Includes proper handling for entitlement errors and an SSH-to-tunnel docs page for when you're SSH'd into a remote box and need to complete the OAuth flow. ([#26534](https://github.com/NousResearch/hermes-agent/pull/26534), [#26664](https://github.com/NousResearch/hermes-agent/pull/26664), [#26644](https://github.com/NousResearch/hermes-agent/pull/26644), [#26592](https://github.com/NousResearch/hermes-agent/pull/26592))"
+      },
+      {
+        "title": "OpenAI-compatible local proxy for OAuth providers",
+        "text": "Run `hermes proxy` and you get a `http://localhost:port` endpoint that speaks the OpenAI API but is backed by whichever OAuth provider you're signed into — Claude Pro, ChatGPT Pro, SuperGrok. Now any tool that expects an OpenAI-compatible endpoint (Codex CLI, Aider, Cline, Continue, your custom scripts) just works with your existing subscription, no API key required. One subscription, every tool. ([#25969](https://github.com/NousResearch/hermes-agent/pull/25969))"
+      },
+      {
+        "title": "`x_search` — first-class X (Twitter) search tool",
+        "text": "The agent can now search X directly without installing a skill or wiring up a custom integration. Search the timeline, find threads, surface specific posts — straight from the chat. Auth with either your X OAuth login or an API key, whichever you have. ([#26763](https://github.com/NousResearch/hermes-agent/pull/26763))"
+      },
+      {
+        "title": "Microsoft Teams — end-to-end",
+        "text": "Hermes can now read messages from Teams and post back. The full Microsoft Graph stack lands together: auth + client foundation, a webhook listener that receives Teams events, a pipeline plugin runtime, and outbound delivery. Wire up the bot once, then chat to your agent from any Teams channel, DM, or group. (salvages of #21408–#21411) ([#21922](https://github.com/NousResearch/hermes-agent/pull/21922), [#21969](https://github.com/NousResearch/hermes-agent/pull/21969), [#22007](https://github.com/NousResearch/hermes-agent/pull/22007), [#22024](https://github.com/NousResearch/hermes-agent/pull/22024))"
+      },
+      {
+        "title": "Debloating wave — lighter installs, less you don't use",
+        "text": "A clean `pip install hermes-agent` used to pull down everything: every messaging adapter SDK, every image-gen SDK, every voice/TTS provider, whether you used them or not. Now those heavy backends (Slack / Matrix / Feishu / DingTalk adapters, hindsight client, codex app-server, Pixverse / Camofox / image-gen SDKs, voice/TTS providers) install automatically the first time you actually use them. The `[all]` extras drop everything covered by lazy-deps, the installer falls back through tiers when a wheel doesn't fit your platform, and a supply-chain advisory checker scans every install for unsafe versions. Faster installs, smaller disk footprint, fewer transitive vulnerabilities. ([#24220](https://github.com/NousResearch/hermes-agent/pull/24220), [#24515](https://github.com/NousResearch/hermes-agent/pull/24515), [#25014](https://github.com/NousResearch/hermes-agent/pull/25014), [#25038](https://github.com/NousResearch/hermes-agent/pull/25038), [#25766](https://github.com/NousResearch/hermes-agent/pull/25766), [#21818](https://github.com/NousResearch/hermes-agent/pull/21818))"
+      },
+      {
+        "title": "`pip install hermes-agent && hermes`",
+        "text": "Hermes Agent is now a real PyPI package. No more cloning the repo or running shell installers — one pip command and you're running. The wheel ships with the Ink TUI bundle and the shell launcher, so the full experience comes out of the box. (salvage of [#26350](https://github.com/NousResearch/hermes-agent/pull/26350)) ([#26593](https://github.com/NousResearch/hermes-agent/pull/26593), [#26148](https://github.com/NousResearch/hermes-agent/pull/26148))"
+      },
+      {
+        "title": "Cross-session 1h Claude prompt cache",
+        "text": "When you use Claude through Anthropic, OpenRouter, or Nous Portal, the prompt prefix (system prompt, skills, memory) now caches for an hour across sessions. Start a `/new` session and the first response comes back faster and cheaper because the cache is still warm from your last session. Background memory review hits the cache too, so it's not paying full price every turn. ([#23828](https://github.com/NousResearch/hermes-agent/pull/23828), [#25434](https://github.com/NousResearch/hermes-agent/pull/25434), [#24778](https://github.com/NousResearch/hermes-agent/pull/24778))"
+      },
+      {
+        "title": "180x faster `browser_console` evaluations",
+        "text": "When the agent uses the browser tool to inspect a page or run JavaScript, those calls now share one persistent connection to Chrome instead of spinning up a new DevTools session every time. The difference is huge: things that used to take a couple of seconds per call return in milliseconds. Real-world page interactions feel instant. ([#23226](https://github.com/NousResearch/hermes-agent/pull/23226))"
+      },
+      {
+        "title": "Cold-start performance wave — ~19 seconds off `hermes` launch",
+        "text": "Running `hermes` used to make you wait through a chunk of import overhead and network calls before you saw a prompt. Now the launch path is mostly deferred: heavy adapters only load when you use them, model catalogs come from disk cache first, doctor checks run in parallel, and `chat -q` skips the welcome banner entirely. The `hermes tools` All-Platforms screen alone dropped from 14 seconds to under 1.5 seconds. ([#22138](https://github.com/NousResearch/hermes-agent/pull/22138), [#22120](https://github.com/NousResearch/hermes-agent/pull/22120), [#22681](https://github.com/NousResearch/hermes-agent/pull/22681), [#22790](https://github.com/NousResearch/hermes-agent/pull/22790), [#22808](https://github.com/NousResearch/hermes-agent/pull/22808), [#22831](https://github.com/NousResearch/hermes-agent/pull/22831), [#22859](https://github.com/NousResearch/hermes-agent/pull/22859), [#22904](https://github.com/NousResearch/hermes-agent/pull/22904), [#22766](https://github.com/NousResearch/hermes-agent/pull/22766), [#25341](https://github.com/NousResearch/hermes-agent/pull/25341))"
+      },
+      {
+        "title": "Two new messaging platforms — LINE + SimpleX Chat",
+        "text": "LINE is huge in Japan, Korea, and Taiwan, and now Hermes runs natively on the LINE Messaging API. SimpleX Chat is the privacy-focused decentralized messenger with no user IDs — also wired up as a first-class platform. That brings Hermes to 22 messaging platforms total, so wherever you and your team chat, the agent can be there. ([#23197](https://github.com/NousResearch/hermes-agent/pull/23197), [#26232](https://github.com/NousResearch/hermes-agent/pull/26232))"
+      },
+      {
+        "title": "`/handoff` actually transfers the session live",
+        "text": "Switching models or personalities mid-conversation used to mean losing context or starting over. Now `/handoff` moves your active session — every message, every tool call, every piece of context — to the target model, persona, or profile, live, without dropping anything. Mid-debugging hand off from a fast model to a deep-reasoning one, or pass a session between profiles for different parts of a task. ([#23395](https://github.com/NousResearch/hermes-agent/pull/23395))"
+      },
+      {
+        "title": "Native button UI for `clarify` on Telegram and Discord",
+        "text": "When the agent uses the `clarify` tool to ask you a multiple-choice question, it now shows real platform-native buttons on Telegram and Discord instead of asking you to type back the option number. Tap the button, the agent gets your answer. Especially nice on mobile. ([#24199](https://github.com/NousResearch/hermes-agent/pull/24199), [#25485](https://github.com/NousResearch/hermes-agent/pull/25485))"
+      },
+      {
+        "title": "Discord channel history backfill (default on)",
+        "text": "When Hermes joins a Discord channel or thread for the first time, it now reads the recent message history so it knows what's been said before it responds. No more \"what are we talking about?\" — the agent has the context that's already on screen for everyone else. ([#25984](https://github.com/NousResearch/hermes-agent/pull/25984))"
+      },
+      {
+        "title": "`vision_analyze` returns pixels to vision-capable models",
+        "text": "When you point the agent at an image with `vision_analyze` and the active model can actually see (GPT-5, Claude, Gemini, Grok-vision), Hermes now passes the raw pixels straight to the model instead of converting them to a text description first. You get the model's actual visual reasoning instead of a degraded text-summary round-trip. ([#22955](https://github.com/NousResearch/hermes-agent/pull/22955))"
+      },
+      {
+        "title": "Per-turn file-mutation verifier footer",
+        "text": "After every turn that wrote or edited files, the agent now gets a short footer summarizing exactly what changed on disk — the file paths, the line counts, the actual delta. That means the agent catches its own mistakes when a write didn't land or got silently overwritten, instead of confidently telling you \"I added the function\" when the file wasn't actually saved. ([#24498](https://github.com/NousResearch/hermes-agent/pull/24498))"
+      },
+      {
+        "title": "LSP semantic diagnostics on every write",
+        "text": "When the agent uses `write_file` or `patch`, Hermes now runs a real language server against the edited file and surfaces any new errors back to the agent before the next turn. Type errors, undefined symbols, missing imports — caught immediately. Goes way beyond v0.13.0's basic Python/JSON/YAML/TOML linting because it's actual semantic analysis. ([#24168](https://github.com/NousResearch/hermes-agent/pull/24168), [#25978](https://github.com/NousResearch/hermes-agent/pull/25978))"
+      },
+      {
+        "title": "Unified `video_generate` with pluggable provider backends",
+        "text": "One tool, any video model. Hermes ships with the obvious backends already, but you can drop in a new video provider as a plugin without touching core. So when a new video model lands next month, it can be a one-file plugin instead of a fork. ([#25126](https://github.com/NousResearch/hermes-agent/pull/25126))"
+      },
+      {
+        "title": "`computer_use` cua-driver backend — works with non-Anthropic models now",
+        "text": "Computer-use (the agent controlling your mouse and keyboard to drive GUI apps) used to be locked to Anthropic's SDK. The new cua-driver backend works with non-Anthropic providers too, has proper focus-safe operations, and refreshes itself on `hermes update`. Now any vision-capable model can drive your desktop. (re-salvage of #16936) ([#21967](https://github.com/NousResearch/hermes-agent/pull/21967), [#24063](https://github.com/NousResearch/hermes-agent/pull/24063))"
+      },
+      {
+        "title": "Clickable URLs in any terminal",
+        "text": "Links in agent output are now real OSC8 hyperlinks with hover-highlight in any terminal that supports them. Click to open in your browser — no more copy-paste-trim of long URLs from the transcript. Just works in iTerm2, Kitty, Ghostty, modern Windows Terminal, etc. (@OutThisLife) ([#25071](https://github.com/NousResearch/hermes-agent/pull/25071), [#24013](https://github.com/NousResearch/hermes-agent/pull/24013))"
+      },
+      {
+        "title": "Zed ACP Registry — `uvx` install in one click",
+        "text": "Hermes is now listed in Zed's Agent Client Protocol registry, so Zed users can install it with one click. The install path uses `uvx` so there's no npm dependency. `hermes acp --setup-browser` bootstraps the browser tools for registry-driven installs. (salvage of [#25908](https://github.com/NousResearch/hermes-agent/pull/25908)) ([#26079](https://github.com/NousResearch/hermes-agent/pull/26079), [#26120](https://github.com/NousResearch/hermes-agent/pull/26120), [#26234](https://github.com/NousResearch/hermes-agent/pull/26234))"
+      },
+      {
+        "title": "OpenRouter Pareto Code router with `min_coding_score` knob",
+        "text": "OpenRouter's \"Pareto\" router automatically picks the cheapest model that meets a minimum quality bar. The new `min_coding_score` config lets you set that bar for coding tasks specifically — Hermes routes to the most affordable model that's at least that good at code. Stop paying for top-tier models when a mid-tier one would do. ([#22838](https://github.com/NousResearch/hermes-agent/pull/22838))"
+      },
+      {
+        "title": "NovitaAI as a new model provider",
+        "text": "NovitaAI joins the provider lineup, giving you another option for open-source model hosting (Llama, Qwen, DeepSeek, etc.) with their pricing and rate limits. (salvage #7219) (@kshitijk4poor) ([#25507](https://github.com/NousResearch/hermes-agent/pull/25507))"
+      },
+      {
+        "title": "Codex app-server runtime for OpenAI/Codex models",
+        "text": "An optional runtime that drives OpenAI's Codex CLI under the hood when you're using OpenAI or Codex paths. You get session reuse, automatic retirement of wedged sessions, and proper OAuth refresh classification — the kind of plumbing that makes long agentic runs not fall over. ([#24182](https://github.com/NousResearch/hermes-agent/pull/24182), [#25769](https://github.com/NousResearch/hermes-agent/pull/25769))"
+      },
+      {
+        "title": "`huggingface/skills` as a trusted default tap",
+        "text": "The community skills index hosted at huggingface.co/skills is now wired into the Skills Hub by default. So when somebody publishes a useful skill there, you can install it from your own `hermes skills` browser without any extra config. (closes #2549) ([#26219](https://github.com/NousResearch/hermes-agent/pull/26219))"
+      },
+      {
+        "title": "9 new optional skills",
+        "text": "Hyperliquid (perp + spot trading via the SDK and REST API), Yahoo Finance (live market data, fundamentals, historicals), api-testing (REST + GraphQL debug recipes), unified EVM multi-chain (one skill covers Ethereum + L2s + Base), darwinian-evolver (evolutionary prompt/skill tuning), osint-investigation (OSINT recipes for people / domains / orgs), pinggy-tunnel (expose local services to the public internet), watchers (polls RSS / HTTP JSON / GitHub via cron `no_agent` mode for change detection), and a full Notion overhaul for the May 2026 Developer Platform. ([#23582](https://github.com/NousResearch/hermes-agent/pull/23582), [#23583](https://github.com/NousResearch/hermes-agent/pull/23583), [#23590](https://github.com/NousResearch/hermes-agent/pull/23590), [#25299](https://github.com/NousResearch/hermes-agent/pull/25299), [#26760](https://github.com/NousResearch/hermes-agent/pull/26760), [#26729](https://github.com/NousResearch/hermes-agent/pull/26729), [#26765](https://github.com/NousResearch/hermes-agent/pull/26765), [#21881](https://github.com/NousResearch/hermes-agent/pull/21881), [#26612](https://github.com/NousResearch/hermes-agent/pull/26612))"
+      },
+      {
+        "title": "API server exposes run approval events",
+        "text": "If you're driving Hermes programmatically through the HTTP API, long-running runs no longer silently hang when the agent hits an approval-required command. The approval request now surfaces on the API stream so your client can prompt the user and reply — no more silent stalls. (salvage of [#20311](https://github.com/NousResearch/hermes-agent/pull/20311)) ([#21899](https://github.com/NousResearch/hermes-agent/pull/21899))"
+      },
+      {
+        "title": "Plugins can run any LLM call via `ctx.llm` + replace built-in tools via `tool_override`",
+        "text": "If you're writing a Hermes plugin, you now get first-class access to make LLM calls through the active provider and credentials — no manual client wiring. The new `tool_override` flag lets a plugin swap out a built-in tool with its own implementation cleanly. Plugin authors get the same model-routing and auth plumbing the core agent uses. (closes #11049) ([#23194](https://github.com/NousResearch/hermes-agent/pull/23194), [#26759](https://github.com/NousResearch/hermes-agent/pull/26759))"
+      },
+      {
+        "title": "Brave Search (free tier) + DuckDuckGo (DDGS) as web-search providers",
+        "text": "Two new free web-search backends join Tavily, SearXNG, and Exa. Brave Search has a generous free tier; DDGS is the DuckDuckGo scraper that needs no key at all. Pick whichever fits your budget and rate-limit needs. ([#21337](https://github.com/NousResearch/hermes-agent/pull/21337))"
+      },
+      {
+        "title": "Sudo brute-force block + 3 dangerous-command bypasses closed + tool-error sanitization",
+        "text": "The approval gate now blocks `sudo -S` brute-force attempts and classifies stdin-fed or askpass-stripped sudo invocations as DANGEROUS. Three known bypasses of dangerous-command detection are closed (inspired by Claude Code's command-detection work). And tool error strings are now sanitized before being re-injected into the model context, so a malicious file or remote service can't pass instructions to your agent through error output. ([#23736](https://github.com/NousResearch/hermes-agent/pull/23736), [#26829](https://github.com/NousResearch/hermes-agent/pull/26829), [#26823](https://github.com/NousResearch/hermes-agent/pull/26823))"
+      },
+      {
+        "title": "`/subgoal` — user-added criteria appended to an active `/goal`",
+        "text": "When you've got a `/goal` running (the persistent Ralph-loop goal where the agent keeps going until criteria are met), you can now use `/subgoal <text>` to layer extra success criteria onto it mid-run. The judge factors your new criteria into the done-or-keep-going decision without restarting the loop. ([#25449](https://github.com/NousResearch/hermes-agent/pull/25449))"
+      },
+      {
+        "title": "Provider rename — Alibaba Cloud → Qwen Cloud",
+        "text": "The Alibaba Cloud provider is renamed to Qwen Cloud in the picker and config to match what the rest of the world calls it. Existing config keys still work — no breaking changes — but the UI matches the actual brand now. ([#24835](https://github.com/NousResearch/hermes-agent/pull/24835))"
+      },
+      {
+        "title": "Native Windows support (early beta)",
+        "text": "Hermes now runs natively on `cmd.exe` and PowerShell without WSL. A full PowerShell installer handles MinGit auto-install, Microsoft Store python stub detection, and the foreground Ctrl+C dance. There's still rough edges (this is the \"early beta\" stamp) — ~40 follow-up Windows-only fixes already landed in the window — but the basic loop works end-to-end on a clean Windows box. ([#21561](https://github.com/NousResearch/hermes-agent/pull/21561))"
+      }
+    ],
+    "commit": "a91a57fa5a13d516c38b07a141a9ce8a3daabeb0"
+  },
+  "release_fetch_error": "",
+  "comparison_label": "origin/main since v2026.5.16",
+  "commit_count": 155,
+  "category_counts": {
+    "Core agent/model routing": 66,
+    "Tests/reliability": 52,
+    "Tools/toolsets": 10,
+    "CLI/TUI": 32,
+    "Internal/other": 14,
+    "Gateway/platforms": 17,
+    "Dashboard/Web UI": 2,
+    "Install/dependencies": 7,
+    "Kanban/multi-agent": 3,
+    "Skills": 1,
+    "Docs": 19,
+    "Cron/automation": 1
+  },
+  "importance_counts": {
+    "Medium": 54,
+    "High": 90,
+    "Low": 11
+  },
+  "category_commits": {
+    "Core agent/model routing": [
+      {
+        "short": "f36c89cd5",
+        "full": "f36c89cd5798da0f313192555739975e57ffdef5",
+        "date": "2026-05-17",
+        "subject": "fix(plugins/browser): carry forward requests.RequestException wrapping",
+        "importance": "Medium"
+      },
+      {
+        "short": "c74ff2c8e",
+        "full": "c74ff2c8effce1615074820b03e0d13997c62bb5",
+        "date": "2026-05-14",
+        "subject": "fix(browser): self-review pass — dead-import, log levels, future-proofing",
+        "importance": "Medium"
+      },
+      {
+        "short": "fec0a0da9",
+        "full": "fec0a0da985f42cab63141c9a6a09d2468144a00",
+        "date": "2026-05-14",
+        "subject": "test(plugins/browser): coverage for the 3-plugin migration",
+        "importance": "Medium"
+      },
+      {
+        "short": "250caebeb",
+        "full": "250caebeb18c2445f8f67db4eff1e08718273ff7",
+        "date": "2026-05-14",
+        "subject": "refactor(browser): delete tools/browser_providers/ directory; migrate tests",
+        "importance": "High"
+      },
+      {
+        "short": "40fde853f",
+        "full": "40fde853fa6a84bf129a3f0958d15974887ccc78",
+        "date": "2026-05-14",
+        "subject": "refactor(browser): dispatch _get_cloud_provider through agent.browser_registry",
+        "importance": "High"
+      },
+      {
+        "short": "a15cdfb05",
+        "full": "a15cdfb0509db31b094aa0ff034b2432c43bc6e1",
+        "date": "2026-05-14",
+        "subject": "feat(browser): browser-use + firecrawl plugins; drop single-eligible shortcut",
+        "importance": "High"
+      },
+      {
+        "short": "b8138ac40",
+        "full": "b8138ac4054935e117e2a5b2042fe9f01bb06e09",
+        "date": "2026-05-14",
+        "subject": "feat(browser): browserbase plugin (spike — first migration)",
+        "importance": "High"
+      },
+      {
+        "short": "c6e6909e5",
+        "full": "c6e6909e5a18f4c1a83eb48f0297e47fd17feed6",
+        "date": "2026-05-14",
+        "subject": "feat(browser): add BrowserProvider ABC mirroring web_search_provider template",
+        "importance": "High"
+      },
+      {
+        "short": "c02606a38",
+        "full": "c02606a385bd03630b7c76b72bf82f686a51f907",
+        "date": "2026-05-17",
+        "subject": "chore(deps): lazy-install boto3/botocore for bedrock adapter",
+        "importance": "Medium"
+      },
+      {
+        "short": "dbeaaa47f",
+        "full": "dbeaaa47f2df6ce11906ab9cdf386e80b3a0a427",
+        "date": "2026-05-17",
+        "subject": "refactor(security): extract _block_message helper to unify block logic in _parse_response",
+        "importance": "High"
+      },
+      {
+        "short": "63805965e",
+        "full": "63805965e7a907f6b5e3a687fc37bed2004e7634",
+        "date": "2026-05-17",
+        "subject": "fix(security): restore type safety and extract constant in shell hook block handler",
+        "importance": "High"
+      },
+      {
+        "short": "aeda14611",
+        "full": "aeda146112c840372ae6f091c28d6379d8db6509",
+        "date": "2026-05-17",
+        "subject": "fix(security): honor shell hook blocks even when message/reason is absent",
+        "importance": "High"
+      },
+      {
+        "short": "d9abbe7fa",
+        "full": "d9abbe7fa4c69333a226b7a2d366713b3f071187",
+        "date": "2026-05-17",
+        "subject": "fix(metadata): qwen3.6-plus has a 1M context window (#27008)",
+        "importance": "Medium"
+      },
+      {
+        "short": "5fba23664",
+        "full": "5fba236644a9c2aa18501fdef1484e5b6fecfb85",
+        "date": "2026-05-17",
+        "subject": "chore: ruff auto-fix PLR6201 resweep — tuple → set in membership tests (#27355)",
+        "importance": "High"
+      },
+      {
+        "short": "563b4d9e5",
+        "full": "563b4d9e51a46cc421e327b351cb7efe1ccb151b",
+        "date": "2026-05-16",
+        "subject": "fix: strip image parts for non-vision models with provider profiles + getattr-safe _custom_providers",
+        "importance": "High"
+      },
+      {
+        "short": "36ad8336f",
+        "full": "36ad8336f9fcf2fe03f43782281cc7a555cbc6ed",
+        "date": "2026-05-16",
+        "subject": "fix(run_agent): guard memory provider init against empty/whitespace string",
+        "importance": "High"
+      },
+      {
+        "short": "4ece521bc",
+        "full": "4ece521bcf37401686e73f1d08ebaa87caaae05a",
+        "date": "2026-05-16",
+        "subject": "fix(run_agent): isolate background review fork from external memory plugins (#27190)",
+        "importance": "Medium"
+      },
+      {
+        "short": "b5bcffe16",
+        "full": "b5bcffe1674fa9ab3ba7a754c07ab77bedde83a8",
+        "date": "2026-05-16",
+        "subject": "fix(fallback): forward custom_providers to fallback model context-length detection",
+        "importance": "High"
+      },
+      {
+        "short": "4ab9a06a5",
+        "full": "4ab9a06a51268a2864cc66ee36ef34bf6f9ef6e8",
+        "date": "2026-05-16",
+        "subject": "fix(agent): reset _fallback_index at turn start even when no fallback activated",
+        "importance": "Medium"
+      },
+      {
+        "short": "aa05ffba5",
+        "full": "aa05ffba530fde599b6515120578364cce682ac7",
+        "date": "2026-05-16",
+        "subject": "fix(xai): surface provider 'error' SSE frame in Codex fallback stream (#27184)",
+        "importance": "High"
+      },
+      {
+        "short": "80fa92a49",
+        "full": "80fa92a491c67ae98c43ea723487db640d99857f",
+        "date": "2026-05-16",
+        "subject": "fix(codex): rotate pool on usage limit 429 — port to extracted modules",
+        "importance": "Medium"
+      },
+      {
+        "short": "df22d2952",
+        "full": "df22d29522ced894ab79ff66e4496c2c93be65c4",
+        "date": "2026-05-16",
+        "subject": "fix(copilot): GitHub Models 413 hint — port to extracted conversation_loop",
+        "importance": "High"
+      },
+      {
+        "short": "3fbedd732",
+        "full": "3fbedd732e5179759d797927fd0f2cf4324682b2",
+        "date": "2026-05-16",
+        "subject": "feat: add supports_parallel_tool_calls for MCP servers (#26825) — port to tool_dispatch_helpers",
+        "importance": "High"
+      },
+      {
+        "short": "fe4c87eb2",
+        "full": "fe4c87eb28907c467f60335d75680a50e77b15c9",
+        "date": "2026-05-16",
+        "subject": "fix(agent): retry malformed anthropic stream parser errors — port to extracted modules",
+        "importance": "Medium"
+      },
+      {
+        "short": "f885be030",
+        "full": "f885be030cc2521a4dd20122c66f411f9c1377e5",
+        "date": "2026-05-16",
+        "subject": "fix(auxiliary): resolve xai oauth compression from pool — port to conversation_compression",
+        "importance": "High"
+      },
+      {
+        "short": "6975a2d9a",
+        "full": "6975a2d9ae20c5131c4fd3b3758dc9eade8cc6a0",
+        "date": "2026-05-16",
+        "subject": "fix(xai-oauth): entitlement-403 chain — final state (ce0e189d3 + 9818b9a1a + 6784c8079 + dffb602f3)",
+        "importance": "High"
+      },
+      {
+        "short": "6362e7197",
+        "full": "6362e71973c18b407651157f818e279122ce41f6",
+        "date": "2026-05-16",
+        "subject": "fix(xai-oauth): recover from prelude SSE errors, gate reasoning replay, surface entitlement 403s",
+        "importance": "High"
+      },
+      {
+        "short": "27df24956",
+        "full": "27df249564b3ce6fa4d1db883df0329bfda01593",
+        "date": "2026-05-16",
+        "subject": "feat(nvidia): add NIM billing origin header — port to extracted modules",
+        "importance": "High"
+      },
+      {
+        "short": "b07524e53",
+        "full": "b07524e53aed5e8629b98ce3bbf3a54a27d596f4",
+        "date": "2026-05-16",
+        "subject": "feat(xai-oauth): add xAI Grok OAuth (SuperGrok Subscription) provider — port to extracted modules",
+        "importance": "High"
+      },
+      {
+        "short": "7d221aa1f",
+        "full": "7d221aa1f288a96a11485845923266499f5a3abb",
+        "date": "2026-05-16",
+        "subject": "fix(langfuse): complete observability fix — port to extracted conversation_loop",
+        "importance": "Medium"
+      },
+      {
+        "short": "a77ca9295",
+        "full": "a77ca9295e96af9f0da522b1bd3afe1965ef21ee",
+        "date": "2026-05-16",
+        "subject": "perf(run_agent): accumulate length-continuation prefix via list+join",
+        "importance": "Medium"
+      },
+      {
+        "short": "94b3131be",
+        "full": "94b3131be7115709c516a79be7c3d01dd71761a8",
+        "date": "2026-05-16",
+        "subject": "fix(run_agent): detect kimi models via model name for reasoning pad",
+        "importance": "High"
+      },
+      {
+        "short": "8f3bc17db",
+        "full": "8f3bc17db9ebe1d9108ae69b14fcc3f06734554b",
+        "date": "2026-05-14",
+        "subject": "feat(agent): Added gemma 4 to reasoning allowlist",
+        "importance": "High"
+      },
+      {
+        "short": "52c89715a",
+        "full": "52c89715a29198d838dac54e229aba9cf328e408",
+        "date": "2026-05-16",
+        "subject": "fix: respect user-configured vision model for OpenRouter",
+        "importance": "High"
+      },
+      {
+        "short": "b389796ae",
+        "full": "b389796ae3a33256ff1b4077acc1169831fb63e1",
+        "date": "2026-05-14",
+        "subject": "fix(auxiliary): resolve api_key_env alias in named custom provider path of resolve_provider_client",
+        "importance": "High"
+      },
+      {
+        "short": "75e5d0f6b",
+        "full": "75e5d0f6bd412ff4ae719a6ebd98bfd5a471f66c",
+        "date": "2026-05-16",
+        "subject": "fix: strip image parts for non-vision models with provider profiles",
+        "importance": "High"
+      },
+      {
+        "short": "47823790b",
+        "full": "47823790b00255b54c999b9559df2617f18b1df5",
+        "date": "2026-05-16",
+        "subject": "refactor(run_agent): review fixes — keyword-forward __init__, drop dead code, tighten guards",
+        "importance": "Medium"
+      },
+      {
+        "short": "773a0faca",
+        "full": "773a0faca0888df7b1ea310c554b70a18710813c",
+        "date": "2026-05-16",
+        "subject": "fix(deepseek): set default_aux_model on profile so aux warning stops firing",
+        "importance": "High"
+      },
+      {
+        "short": "9a9f8a6d9",
+        "full": "9a9f8a6d9945c9bf3118c557f85ad1956de4f553",
+        "date": "2026-05-16",
+        "subject": "fix(run_agent): detect kimi models via model name for reasoning pad",
+        "importance": "High"
+      },
+      {
+        "short": "1a4e64ba0",
+        "full": "1a4e64ba06d071551ae8266ea809de0e412b45c8",
+        "date": "2026-05-16",
+        "subject": "fix(credential_pool): parse ISO-string last_status_at during from_dict rehydration (#25516)",
+        "importance": "Medium"
+      },
+      {
+        "short": "8d756a421",
+        "full": "8d756a421071d0dfd507226c03430413b6de9491",
+        "date": "2026-05-16",
+        "subject": "fix(run_agent): guard memory provider init against empty/whitespace string",
+        "importance": "High"
+      },
+      {
+        "short": "4b17c2411",
+        "full": "4b17c2411ab2518fabe9d87872a03a47d3b8cfcc",
+        "date": "2026-05-17",
+        "subject": "fix(skills): return None instead of truthy stub when skill load fails",
+        "importance": "Medium"
+      },
+      {
+        "short": "94c3e0ab8",
+        "full": "94c3e0ab8ef253eab64c3632b0e9cc8a502f16b9",
+        "date": "2026-05-16",
+        "subject": "refactor(run_agent): extract 10 more helpers to agent/agent_runtime_helpers.py",
+        "importance": "Medium"
+      },
+      {
+        "short": "973f27e95",
+        "full": "973f27e95631aaecbda5e32e3fa9e5d7f6a2e1d3",
+        "date": "2026-05-16",
+        "subject": "fix(run_agent): isolate background review fork from external memory plugins (#27190)",
+        "importance": "Medium"
+      },
+      {
+        "short": "7244116b6",
+        "full": "7244116b687f6e5ff5e869c99cdbb1b09c822799",
+        "date": "2026-05-14",
+        "subject": "feat(agent): Added gemma 4 to reasoning allowlist",
+        "importance": "High"
+      },
+      {
+        "short": "21078ebce",
+        "full": "21078ebcea6dd870835080fdc76a40284418c921",
+        "date": "2026-05-16",
+        "subject": "fix(fallback): forward custom_providers to fallback model context-length detection",
+        "importance": "High"
+      },
+      {
+        "short": "9f408989c",
+        "full": "9f408989c40c2f1ca5830bd571eb5e1701cad0ce",
+        "date": "2026-05-16",
+        "subject": "refactor(run_agent): extract __init__ (1,381 LOC) to agent/agent_init.py",
+        "importance": "Medium"
+      },
+      {
+        "short": "053025238",
+        "full": "053025238434cfbf121873977b39888d7f27d1c1",
+        "date": "2026-05-16",
+        "subject": "refactor(run_agent): extract run_conversation to agent/conversation_loop.py",
+        "importance": "Medium"
+      },
+      {
+        "short": "d35ee7bcd",
+        "full": "d35ee7bcdd652715864d0d0c262790293a2555c6",
+        "date": "2026-05-16",
+        "subject": "refactor(run_agent): move review prompts to agent/background_review.py",
+        "importance": "Medium"
+      },
+      {
+        "short": "c42fa94af",
+        "full": "c42fa94afc39c7caca15cdb7b951cc338a4587f0",
+        "date": "2026-05-16",
+        "subject": "refactor(run_agent): extract Codex runtime + assorted helpers to dedicated modules",
+        "importance": "Medium"
+      },
+      {
+        "short": "0430e71ec",
+        "full": "0430e71ec971d673a6d2a32fd54c1847683a16d2",
+        "date": "2026-05-16",
+        "subject": "refactor(run_agent): extract streaming API caller (893 LOC) to agent/chat_completion_helpers.py",
+        "importance": "Medium"
+      },
+      {
+        "short": "4b25619bc",
+        "full": "4b25619bc4770396faf206429ddc180ad02231a9",
+        "date": "2026-05-16",
+        "subject": "refactor(run_agent): extract chat-completion helpers to agent/chat_completion_helpers.py",
+        "importance": "Medium"
+      },
+      {
+        "short": "57f6762ca",
+        "full": "57f6762ca085839833b1eb9e2ca9e6cb69abcc4a",
+        "date": "2026-05-16",
+        "subject": "refactor(run_agent): extract stream diagnostics to agent/stream_diag.py",
+        "importance": "Medium"
+      },
+      {
+        "short": "79559214a",
+        "full": "79559214a650e8d6bab03337fecf307abff6a731",
+        "date": "2026-05-16",
+        "subject": "refactor(run_agent): extract tool execution to agent/tool_executor.py",
+        "importance": "High"
+      },
+      {
+        "short": "2d2cd5e90",
+        "full": "2d2cd5e904abc11eb6c00e88e2b6d0c8b025a597",
+        "date": "2026-05-16",
+        "subject": "refactor(run_agent): extract system-prompt builder to agent/system_prompt.py",
+        "importance": "Medium"
+      },
+      {
+        "short": "5311d9959",
+        "full": "5311d9959e19477aac8aa7deca46c1ee0b8e7000",
+        "date": "2026-05-16",
+        "subject": "refactor(run_agent): extract context compression to agent/conversation_compression.py",
+        "importance": "Medium"
+      },
+      {
+        "short": "1f6eb1738",
+        "full": "1f6eb1738c206e95c3e0641c3d8000a4d0be841b",
+        "date": "2026-05-16",
+        "subject": "refactor(run_agent): extract background memory/skill review to agent/background_review.py",
+        "importance": "Medium"
+      },
+      {
+        "short": "5f309ae68",
+        "full": "5f309ae685d08a2d23eaa992a5bca1f70f52486a",
+        "date": "2026-05-16",
+        "subject": "refactor(run_agent): extract OpenAI proxy, safe stdio, IterationBudget",
+        "importance": "High"
+      },
+      {
+        "short": "59f1c0f0b",
+        "full": "59f1c0f0b668db8311b8ea15bdfc2d1fe373227d",
+        "date": "2026-05-16",
+        "subject": "refactor(run_agent): extract tool-dispatch helpers to agent/tool_dispatch_helpers.py",
+        "importance": "High"
+      },
+      {
+        "short": "885d1242a",
+        "full": "885d1242a265e1a373311dbc1899c569dac56646",
+        "date": "2026-05-16",
+        "subject": "refactor(run_agent): extract message sanitization to agent/message_sanitization.py",
+        "importance": "Medium"
+      },
+      {
+        "short": "3b3909690",
+        "full": "3b39096904ae63a9e784b2403ad6ad27160bb2ef",
+        "date": "2026-05-16",
+        "subject": "Port from Kilo-Org/kilocode#9434: strip historical media after compression (#27189)",
+        "importance": "Medium"
+      },
+      {
+        "short": "33528b428",
+        "full": "33528b428d196443f788f43fec3139bd6e2c4997",
+        "date": "2026-05-06",
+        "subject": "fix(agent): reset _fallback_index at turn start even when no fallback activated",
+        "importance": "Medium"
+      },
+      {
+        "short": "2b193907d",
+        "full": "2b193907d668af0c45f108d885db53a7ce8b8919",
+        "date": "2026-05-16",
+        "subject": "fix(xai): surface provider 'error' SSE frame in Codex fallback stream (#27184)",
+        "importance": "High"
+      },
+      {
+        "short": "e51d74ab9",
+        "full": "e51d74ab917675a67e6a964d6c2c2ea2b150ac2c",
+        "date": "2026-05-15",
+        "subject": "fix(codex): rotate pool on usage limit 429",
+        "importance": "Medium"
+      },
+      {
+        "short": "dffb602f3",
+        "full": "dffb602f37b3c1b9c9fd7f0417aab3af56cffa38",
+        "date": "2026-05-16",
+        "subject": "fix(xai): drop stale X Premium+ hint from entitlement 403 surfacing (#27110)",
+        "importance": "Medium"
+      },
+      {
+        "short": "93e109a1d",
+        "full": "93e109a1d552b03c847b96077428048cceb012cd",
+        "date": "2026-05-16",
+        "subject": "fix(moonshot): strip $ref siblings and collapse tuple items in tool schemas (#27104)",
+        "importance": "High"
+      }
+    ],
+    "Tests/reliability": [
+      {
+        "short": "c74ff2c8e",
+        "full": "c74ff2c8effce1615074820b03e0d13997c62bb5",
+        "date": "2026-05-14",
+        "subject": "fix(browser): self-review pass — dead-import, log levels, future-proofing",
+        "importance": "Medium"
+      },
+      {
+        "short": "1bb6f0372",
+        "full": "1bb6f03724590e5755619e97d0fe580d2cc92f9e",
+        "date": "2026-05-14",
+        "subject": "fix(browser): ensure plugin discovery before registry lookup; parity harness",
+        "importance": "Medium"
+      },
+      {
+        "short": "fec0a0da9",
+        "full": "fec0a0da985f42cab63141c9a6a09d2468144a00",
+        "date": "2026-05-14",
+        "subject": "test(plugins/browser): coverage for the 3-plugin migration",
+        "importance": "Medium"
+      },
+      {
+        "short": "250caebeb",
+        "full": "250caebeb18c2445f8f67db4eff1e08718273ff7",
+        "date": "2026-05-14",
+        "subject": "refactor(browser): delete tools/browser_providers/ directory; migrate tests",
+        "importance": "High"
+      },
+      {
+        "short": "40fde853f",
+        "full": "40fde853fa6a84bf129a3f0958d15974887ccc78",
+        "date": "2026-05-14",
+        "subject": "refactor(browser): dispatch _get_cloud_provider through agent.browser_registry",
+        "importance": "High"
+      },
+      {
+        "short": "63805965e",
+        "full": "63805965e7a907f6b5e3a687fc37bed2004e7634",
+        "date": "2026-05-17",
+        "subject": "fix(security): restore type safety and extract constant in shell hook block handler",
+        "importance": "High"
+      },
+      {
+        "short": "6622277f1",
+        "full": "6622277f11ca1dee03e868b064fb1851e5598b77",
+        "date": "2026-05-15",
+        "subject": "fix ACP start events for polished tools",
+        "importance": "High"
+      },
+      {
+        "short": "d9abbe7fa",
+        "full": "d9abbe7fa4c69333a226b7a2d366713b3f071187",
+        "date": "2026-05-17",
+        "subject": "fix(metadata): qwen3.6-plus has a 1M context window (#27008)",
+        "importance": "Medium"
+      },
+      {
+        "short": "5a2a858b8",
+        "full": "5a2a858b84c3e189c7d4ab7db94205c0a2ef480f",
+        "date": "2026-05-17",
+        "subject": "test(restart_drain): assert i18n catalog resolved (#22266)",
+        "importance": "Low"
+      },
+      {
+        "short": "d87b27cff",
+        "full": "d87b27cff86fe5dcf07cbdb073608674f8b92b3c",
+        "date": "2026-05-14",
+        "subject": "fix(gateway): add codex runtime telegram alias",
+        "importance": "High"
+      },
+      {
+        "short": "5fba23664",
+        "full": "5fba236644a9c2aa18501fdef1484e5b6fecfb85",
+        "date": "2026-05-17",
+        "subject": "chore: ruff auto-fix PLR6201 resweep — tuple → set in membership tests (#27355)",
+        "importance": "High"
+      },
+      {
+        "short": "ad00777f0",
+        "full": "ad00777f042d9c2ca23f1575ef1036a5b59d6195",
+        "date": "2026-05-16",
+        "subject": "fix(mcp-oauth): print SSH tunnel hint in _redirect_handler",
+        "importance": "High"
+      },
+      {
+        "short": "a9ba636d5",
+        "full": "a9ba636d535faa6aaf928f5c6c575209bb292f58",
+        "date": "2026-05-16",
+        "subject": "fix(tools): run post_setup in _reconfigure_provider() for env-var providers",
+        "importance": "High"
+      },
+      {
+        "short": "ad1aa1a03",
+        "full": "ad1aa1a037a0603b09593dfdce1efd8111936c8f",
+        "date": "2026-05-17",
+        "subject": "feat(x_search): auto-enable toolset when xAI OAuth or XAI_API_KEY is configured (#27376)",
+        "importance": "High"
+      },
+      {
+        "short": "519657aa9",
+        "full": "519657aa98d4969ec9e23c70c074d1982ef3ccf1",
+        "date": "2026-05-17",
+        "subject": "fix(matrix): warn on clock-skew silent message drops (#12614) (#27330)",
+        "importance": "High"
+      },
+      {
+        "short": "5631345b1",
+        "full": "5631345b12aa5fa7ead11203624e646b42c8936f",
+        "date": "2026-05-16",
+        "subject": "[agent] fix: harden api server response headers",
+        "importance": "High"
+      },
+      {
+        "short": "a3017508b",
+        "full": "a3017508bf88e663c318495d191904020f77a0f5",
+        "date": "2026-05-16",
+        "subject": "fix(gateway): preserve underscores in plain-text identifiers",
+        "importance": "High"
+      },
+      {
+        "short": "fdd455bc5",
+        "full": "fdd455bc58b8708eb2c7e3e5d83efca3ec49e4a4",
+        "date": "2026-05-16",
+        "subject": "fix(gateway): avoid zsh status variable in update wrapper",
+        "importance": "High"
+      },
+      {
+        "short": "a52f014a8",
+        "full": "a52f014a8cdefb72d81ca0e1d1208571dc3512d2",
+        "date": "2026-05-15",
+        "subject": "fix(tests): mock keychain in TestReadClaudeCodeCredentials to prevent credential leakage",
+        "importance": "Low"
+      },
+      {
+        "short": "8d4766afc",
+        "full": "8d4766afcae676efba0269787ddad7c769ba6c24",
+        "date": "2026-05-16",
+        "subject": "fix(api_server): coerce stringified booleans in request payloads",
+        "importance": "High"
+      },
+      {
+        "short": "47823790b",
+        "full": "47823790b00255b54c999b9559df2617f18b1df5",
+        "date": "2026-05-16",
+        "subject": "refactor(run_agent): review fixes — keyword-forward __init__, drop dead code, tighten guards",
+        "importance": "Medium"
+      },
+      {
+        "short": "ea2ee51f0",
+        "full": "ea2ee51f0b40eac51e279e3ac746f99c2b38e4c0",
+        "date": "2026-05-17",
+        "subject": "fix(teams): fall back to default port on invalid port config",
+        "importance": "Low"
+      },
+      {
+        "short": "773a0faca",
+        "full": "773a0faca0888df7b1ea310c554b70a18710813c",
+        "date": "2026-05-16",
+        "subject": "fix(deepseek): set default_aux_model on profile so aux warning stops firing",
+        "importance": "High"
+      },
+      {
+        "short": "782d74373",
+        "full": "782d743730e3df193c5969bc9897350fa14429cb",
+        "date": "2026-05-17",
+        "subject": "test(skills): add regression test for skill load failure returning None",
+        "importance": "High"
+      },
+      {
+        "short": "57feef320",
+        "full": "57feef320178ce79070dc7ac9a399d3cf587eca4",
+        "date": "2026-05-17",
+        "subject": "test(gateway): add smoke test for logger init (regression guard for #27154)",
+        "importance": "High"
+      },
+      {
+        "short": "a65f723e6",
+        "full": "a65f723e6847f8d326947011b0d6d345d240ce25",
+        "date": "2026-05-16",
+        "subject": "fix(review): address Copilot follow-up on sanitizer and file decode errors",
+        "importance": "High"
+      },
+      {
+        "short": "290bf9310",
+        "full": "290bf93104652bf6acaf50151f0ddac54cb69fde",
+        "date": "2026-05-16",
+        "subject": "fix(tui): harden Terminal.app render behavior",
+        "importance": "Medium"
+      },
+      {
+        "short": "973f27e95",
+        "full": "973f27e95631aaecbda5e32e3fa9e5d7f6a2e1d3",
+        "date": "2026-05-16",
+        "subject": "fix(run_agent): isolate background review fork from external memory plugins (#27190)",
+        "importance": "Medium"
+      },
+      {
+        "short": "407a11b41",
+        "full": "407a11b4190d7a6ebbc6429d0481545abd86aadc",
+        "date": "2026-05-16",
+        "subject": "feat(discord): allow_any_attachment config to accept arbitrary file types",
+        "importance": "High"
+      },
+      {
+        "short": "053025238",
+        "full": "053025238434cfbf121873977b39888d7f27d1c1",
+        "date": "2026-05-16",
+        "subject": "refactor(run_agent): extract run_conversation to agent/conversation_loop.py",
+        "importance": "Medium"
+      },
+      {
+        "short": "0430e71ec",
+        "full": "0430e71ec971d673a6d2a32fd54c1847683a16d2",
+        "date": "2026-05-16",
+        "subject": "refactor(run_agent): extract streaming API caller (893 LOC) to agent/chat_completion_helpers.py",
+        "importance": "Medium"
+      },
+      {
+        "short": "4b25619bc",
+        "full": "4b25619bc4770396faf206429ddc180ad02231a9",
+        "date": "2026-05-16",
+        "subject": "refactor(run_agent): extract chat-completion helpers to agent/chat_completion_helpers.py",
+        "importance": "Medium"
+      },
+      {
+        "short": "79559214a",
+        "full": "79559214a650e8d6bab03337fecf307abff6a731",
+        "date": "2026-05-16",
+        "subject": "refactor(run_agent): extract tool execution to agent/tool_executor.py",
+        "importance": "High"
+      },
+      {
+        "short": "3b3909690",
+        "full": "3b39096904ae63a9e784b2403ad6ad27160bb2ef",
+        "date": "2026-05-16",
+        "subject": "Port from Kilo-Org/kilocode#9434: strip historical media after compression (#27189)",
+        "importance": "Medium"
+      },
+      {
+        "short": "5cbe0b1c4",
+        "full": "5cbe0b1c4ffabf6aeca31827ba9a76ec35e4d4fb",
+        "date": "2026-05-16",
+        "subject": "test(plugins): cover _discover_all_plugins recursion + cross-link loader",
+        "importance": "Medium"
+      },
+      {
+        "short": "29b1bd0e2",
+        "full": "29b1bd0e20e5848e2be8de431a225174ab6a7fed",
+        "date": "2026-05-16",
+        "subject": "feat(cli): add `hermes send` to pipe script output to any messaging platform (#27188)",
+        "importance": "High"
+      },
+      {
+        "short": "33528b428",
+        "full": "33528b428d196443f788f43fec3139bd6e2c4997",
+        "date": "2026-05-06",
+        "subject": "fix(agent): reset _fallback_index at turn start even when no fallback activated",
+        "importance": "Medium"
+      },
+      {
+        "short": "2b193907d",
+        "full": "2b193907d668af0c45f108d885db53a7ce8b8919",
+        "date": "2026-05-16",
+        "subject": "fix(xai): surface provider 'error' SSE frame in Codex fallback stream (#27184)",
+        "importance": "High"
+      },
+      {
+        "short": "e21cb8d14",
+        "full": "e21cb8d1457f603cda1dc8413efc400721d256e7",
+        "date": "2026-05-16",
+        "subject": "feat(status): append session recap to /status output (#27176)",
+        "importance": "High"
+      },
+      {
+        "short": "226cee43d",
+        "full": "226cee43d97997525e4e26a20075aec98e641418",
+        "date": "2026-05-16",
+        "subject": "feat(cli): show ▶ N indicator in status bar when /background tasks are running (#27175)",
+        "importance": "High"
+      },
+      {
+        "short": "6f817e144",
+        "full": "6f817e1447499cf51d8c966b3f3a600ba3412f85",
+        "date": "2026-05-16",
+        "subject": "fix(telegram): restore DM topic typing indicator",
+        "importance": "High"
+      },
+      {
+        "short": "e51d74ab9",
+        "full": "e51d74ab917675a67e6a964d6c2c2ea2b150ac2c",
+        "date": "2026-05-15",
+        "subject": "fix(codex): rotate pool on usage limit 429",
+        "importance": "Medium"
+      },
+      {
+        "short": "dffb602f3",
+        "full": "dffb602f37b3c1b9c9fd7f0417aab3af56cffa38",
+        "date": "2026-05-16",
+        "subject": "fix(xai): drop stale X Premium+ hint from entitlement 403 surfacing (#27110)",
+        "importance": "Medium"
+      },
+      {
+        "short": "fb05f5d4b",
+        "full": "fb05f5d4b58d4fb20c3a4a98c2c150de3f729f3c",
+        "date": "2026-05-16",
+        "subject": "fix(mcp): validate remote URLs up-front with a clear error (#27105)",
+        "importance": "Medium"
+      },
+      {
+        "short": "93e109a1d",
+        "full": "93e109a1d552b03c847b96077428048cceb012cd",
+        "date": "2026-05-16",
+        "subject": "fix(moonshot): strip $ref siblings and collapse tuple items in tool schemas (#27104)",
+        "importance": "High"
+      },
+      {
+        "short": "dc3d0fe14",
+        "full": "dc3d0fe1489aebd5747fa620d9b2eec751a92a55",
+        "date": "2026-05-16",
+        "subject": "Port from cline/cline#10343: periodic gateway memory logging (#27102)",
+        "importance": "High"
+      },
+      {
+        "short": "fc03c95da",
+        "full": "fc03c95da13105807cb3b3f42a311e4916b456ce",
+        "date": "2026-05-16",
+        "subject": "feat(cli): add /exit --delete flag to remove session on quit (#27101)",
+        "importance": "High"
+      },
+      {
+        "short": "c844d15c3",
+        "full": "c844d15c3d27991a35bbc4ec56558d85122412c9",
+        "date": "2026-05-02",
+        "subject": "fix(update): stream npm install output so postinstall progress is visible (#18840)",
+        "importance": "High"
+      },
+      {
+        "short": "05af78c53",
+        "full": "05af78c53d553f6dd20012ce18eb0c2c02d346c9",
+        "date": "2026-05-16",
+        "subject": "fix(update): make Camofox lazy-installed instead of eager (#27055)",
+        "importance": "High"
+      },
+      {
+        "short": "6c2406c5e",
+        "full": "6c2406c5e131dbbcabb69319c73c02594f63caea",
+        "date": "2026-05-16",
+        "subject": "fix(signal): read groupV2.id in envelope, fall back to legacy groupInfo (#27051)",
+        "importance": "High"
+      },
+      {
+        "short": "3034eee38",
+        "full": "3034eee38ec516109566c00975be4d0276747c34",
+        "date": "2026-05-16",
+        "subject": "fix(acp): replay session history before responding to session/load (#12285 follow-up) (#26957)",
+        "importance": "Low"
+      },
+      {
+        "short": "f3a4af9cf",
+        "full": "f3a4af9cf2a626cb3e055766cb1cff60168d295d",
+        "date": "2026-05-16",
+        "subject": "fix(acp): replay assistant reasoning as agent_thought_chunk on session/load (#12285) (#26943)",
+        "importance": "Low"
+      }
+    ],
+    "Tools/toolsets": [
+      {
+        "short": "c74ff2c8e",
+        "full": "c74ff2c8effce1615074820b03e0d13997c62bb5",
+        "date": "2026-05-14",
+        "subject": "fix(browser): self-review pass — dead-import, log levels, future-proofing",
+        "importance": "Medium"
+      },
+      {
+        "short": "1bb6f0372",
+        "full": "1bb6f03724590e5755619e97d0fe580d2cc92f9e",
+        "date": "2026-05-14",
+        "subject": "fix(browser): ensure plugin discovery before registry lookup; parity harness",
+        "importance": "Medium"
+      },
+      {
+        "short": "250caebeb",
+        "full": "250caebeb18c2445f8f67db4eff1e08718273ff7",
+        "date": "2026-05-14",
+        "subject": "refactor(browser): delete tools/browser_providers/ directory; migrate tests",
+        "importance": "High"
+      },
+      {
+        "short": "40fde853f",
+        "full": "40fde853fa6a84bf129a3f0958d15974887ccc78",
+        "date": "2026-05-14",
+        "subject": "refactor(browser): dispatch _get_cloud_provider through agent.browser_registry",
+        "importance": "High"
+      },
+      {
+        "short": "5fba23664",
+        "full": "5fba236644a9c2aa18501fdef1484e5b6fecfb85",
+        "date": "2026-05-17",
+        "subject": "chore: ruff auto-fix PLR6201 resweep — tuple → set in membership tests (#27355)",
+        "importance": "High"
+      },
+      {
+        "short": "ad00777f0",
+        "full": "ad00777f042d9c2ca23f1575ef1036a5b59d6195",
+        "date": "2026-05-16",
+        "subject": "fix(mcp-oauth): print SSH tunnel hint in _redirect_handler",
+        "importance": "High"
+      },
+      {
+        "short": "8bf09455d",
+        "full": "8bf09455dc498581fe6dea21402ee2a9238a2212",
+        "date": "2026-05-16",
+        "subject": "fix(windows): suppress console window flash on subprocess spawns",
+        "importance": "High"
+      },
+      {
+        "short": "7d09bb191",
+        "full": "7d09bb19155275a18b3952a1f5f399d1dd87df24",
+        "date": "2026-05-15",
+        "subject": "fix(delegate): tool_trace false-positive error detection for short outputs",
+        "importance": "High"
+      },
+      {
+        "short": "60531889d",
+        "full": "60531889d56a9a9d2b3f0b9ee04aea4145ede392",
+        "date": "2026-05-17",
+        "subject": "fix: remove unused import and hoist module-level constant",
+        "importance": "High"
+      },
+      {
+        "short": "fb05f5d4b",
+        "full": "fb05f5d4b58d4fb20c3a4a98c2c150de3f729f3c",
+        "date": "2026-05-16",
+        "subject": "fix(mcp): validate remote URLs up-front with a clear error (#27105)",
+        "importance": "Medium"
+      }
+    ],
+    "CLI/TUI": [
+      {
+        "short": "1b9c539c6",
+        "full": "1b9c539c6e2eaf921b040b706494ce27d409e36c",
+        "date": "2026-05-14",
+        "subject": "feat(tools): mirror image_gen plugin-injection in Browser Automation picker",
+        "importance": "High"
+      },
+      {
+        "short": "c6e6909e5",
+        "full": "c6e6909e5a18f4c1a83eb48f0297e47fd17feed6",
+        "date": "2026-05-14",
+        "subject": "feat(browser): add BrowserProvider ABC mirroring web_search_provider template",
+        "importance": "High"
+      },
+      {
+        "short": "c9298bba0",
+        "full": "c9298bba06e91350aac4af8bc450b4c4f4fb225c",
+        "date": "2026-05-16",
+        "subject": "fix(doctor): SSH check ignores TERMINAL_SSH_USER, TERMINAL_SSH_PORT, TERMINAL_SSH_KEY",
+        "importance": "Medium"
+      },
+      {
+        "short": "3c51da1cb",
+        "full": "3c51da1cb709566cfd3f29b5d3405a7826e97ced",
+        "date": "2026-05-17",
+        "subject": "fix(cli): sync _skill_commands after /reload-skills so Tab completion picks up new skills",
+        "importance": "Medium"
+      },
+      {
+        "short": "d87b27cff",
+        "full": "d87b27cff86fe5dcf07cbdb073608674f8b92b3c",
+        "date": "2026-05-14",
+        "subject": "fix(gateway): add codex runtime telegram alias",
+        "importance": "High"
+      },
+      {
+        "short": "5fba23664",
+        "full": "5fba236644a9c2aa18501fdef1484e5b6fecfb85",
+        "date": "2026-05-17",
+        "subject": "chore: ruff auto-fix PLR6201 resweep — tuple → set in membership tests (#27355)",
+        "importance": "High"
+      },
+      {
+        "short": "a9ba636d5",
+        "full": "a9ba636d535faa6aaf928f5c6c575209bb292f58",
+        "date": "2026-05-16",
+        "subject": "fix(tools): run post_setup in _reconfigure_provider() for env-var providers",
+        "importance": "High"
+      },
+      {
+        "short": "ad1aa1a03",
+        "full": "ad1aa1a037a0603b09593dfdce1efd8111936c8f",
+        "date": "2026-05-17",
+        "subject": "feat(x_search): auto-enable toolset when xAI OAuth or XAI_API_KEY is configured (#27376)",
+        "importance": "High"
+      },
+      {
+        "short": "364a1dd29",
+        "full": "364a1dd290245093f76837c6074bb7d4fdc798c6",
+        "date": "2026-05-16",
+        "subject": "Local: doctor uses x-goog-api-key for Google generativelanguage endpoint",
+        "importance": "Medium"
+      },
+      {
+        "short": "6158964ff",
+        "full": "6158964ff69c0c3ec0ee37fd5de5221b65ac7bcf",
+        "date": "2026-05-16",
+        "subject": "feat: inject current time into goal judge prompt",
+        "importance": "High"
+      },
+      {
+        "short": "6f50c26b2",
+        "full": "6f50c26b2a0254275e8f79a30e8c950cece81ed5",
+        "date": "2026-05-16",
+        "subject": "fix(model-switch): probe /models for custom providers without api_key",
+        "importance": "High"
+      },
+      {
+        "short": "8bf09455d",
+        "full": "8bf09455dc498581fe6dea21402ee2a9238a2212",
+        "date": "2026-05-16",
+        "subject": "fix(windows): suppress console window flash on subprocess spawns",
+        "importance": "High"
+      },
+      {
+        "short": "bde3c7982",
+        "full": "bde3c7982c30796f8709cb0041d34ab36a4d7a9c",
+        "date": "2026-05-16",
+        "subject": "fix: preserve discover_models in _normalize_custom_provider_entry",
+        "importance": "High"
+      },
+      {
+        "short": "7282ef1b9",
+        "full": "7282ef1b9d4ba9b77057f53ca92cbb2ed674129b",
+        "date": "2026-05-15",
+        "subject": "fix: add paste collapse logging to aid debugging",
+        "importance": "High"
+      },
+      {
+        "short": "1eadb069c",
+        "full": "1eadb069c794ecf0626ff5c785191e604ad1f6bc",
+        "date": "2026-05-16",
+        "subject": "fix(kanban): --severity filter uses >= comparison per documented behavior (#26379)",
+        "importance": "High"
+      },
+      {
+        "short": "4e9cedcd4",
+        "full": "4e9cedcd4c6de05a0603a3969b6991fb0836761e",
+        "date": "2026-05-17",
+        "subject": "fix(gateway): add missing logger definition to prevent NameError in _all_platforms",
+        "importance": "High"
+      },
+      {
+        "short": "a65f723e6",
+        "full": "a65f723e6847f8d326947011b0d6d345d240ce25",
+        "date": "2026-05-16",
+        "subject": "fix(review): address Copilot follow-up on sanitizer and file decode errors",
+        "importance": "High"
+      },
+      {
+        "short": "7e1788db5",
+        "full": "7e1788db5d569f61d3aed32f74963208b03835ec",
+        "date": "2026-05-16",
+        "subject": "fix(tui): harden ansi sanitizers for dangling CSI",
+        "importance": "Medium"
+      },
+      {
+        "short": "9b2d58159",
+        "full": "9b2d58159c70b46214d0ef961168bbc826651663",
+        "date": "2026-05-16",
+        "subject": "fix(cli): satisfy ruff encoding requirement in send_cmd",
+        "importance": "Medium"
+      },
+      {
+        "short": "290bf9310",
+        "full": "290bf93104652bf6acaf50151f0ddac54cb69fde",
+        "date": "2026-05-16",
+        "subject": "fix(tui): harden Terminal.app render behavior",
+        "importance": "Medium"
+      },
+      {
+        "short": "407a11b41",
+        "full": "407a11b4190d7a6ebbc6429d0481545abd86aadc",
+        "date": "2026-05-16",
+        "subject": "feat(discord): allow_any_attachment config to accept arbitrary file types",
+        "importance": "High"
+      },
+      {
+        "short": "5cbe0b1c4",
+        "full": "5cbe0b1c4ffabf6aeca31827ba9a76ec35e4d4fb",
+        "date": "2026-05-16",
+        "subject": "test(plugins): cover _discover_all_plugins recursion + cross-link loader",
+        "importance": "Medium"
+      },
+      {
+        "short": "21be7025c",
+        "full": "21be7025c584ea9b1d829e088b6049e259c6859a",
+        "date": "2026-05-16",
+        "subject": "refactor(plugins): drop dead bundled-source guard in _discover_all_plugins",
+        "importance": "Medium"
+      },
+      {
+        "short": "8ab8bc2f0",
+        "full": "8ab8bc2f035ac4ed8b3b43ed2940ba3dc4589cc9",
+        "date": "2026-05-16",
+        "subject": "fix(plugins): remove unreachable hermes tools → Langfuse path",
+        "importance": "High"
+      },
+      {
+        "short": "9b82586c6",
+        "full": "9b82586c6b6dd628af273b3c6875e0142f798089",
+        "date": "2026-05-16",
+        "subject": "fix(plugins): surface category-namespaced plugins in hermes plugins list",
+        "importance": "Medium"
+      },
+      {
+        "short": "29b1bd0e2",
+        "full": "29b1bd0e20e5848e2be8de431a225174ab6a7fed",
+        "date": "2026-05-16",
+        "subject": "feat(cli): add `hermes send` to pipe script output to any messaging platform (#27188)",
+        "importance": "High"
+      },
+      {
+        "short": "e21cb8d14",
+        "full": "e21cb8d1457f603cda1dc8413efc400721d256e7",
+        "date": "2026-05-16",
+        "subject": "feat(status): append session recap to /status output (#27176)",
+        "importance": "High"
+      },
+      {
+        "short": "226cee43d",
+        "full": "226cee43d97997525e4e26a20075aec98e641418",
+        "date": "2026-05-16",
+        "subject": "feat(cli): show ▶ N indicator in status bar when /background tasks are running (#27175)",
+        "importance": "High"
+      },
+      {
+        "short": "dc3d0fe14",
+        "full": "dc3d0fe1489aebd5747fa620d9b2eec751a92a55",
+        "date": "2026-05-16",
+        "subject": "Port from cline/cline#10343: periodic gateway memory logging (#27102)",
+        "importance": "High"
+      },
+      {
+        "short": "fc03c95da",
+        "full": "fc03c95da13105807cb3b3f42a311e4916b456ce",
+        "date": "2026-05-16",
+        "subject": "feat(cli): add /exit --delete flag to remove session on quit (#27101)",
+        "importance": "High"
+      },
+      {
+        "short": "c844d15c3",
+        "full": "c844d15c3d27991a35bbc4ec56558d85122412c9",
+        "date": "2026-05-02",
+        "subject": "fix(update): stream npm install output so postinstall progress is visible (#18840)",
+        "importance": "High"
+      },
+      {
+        "short": "05af78c53",
+        "full": "05af78c53d553f6dd20012ce18eb0c2c02d346c9",
+        "date": "2026-05-16",
+        "subject": "fix(update): make Camofox lazy-installed instead of eager (#27055)",
+        "importance": "High"
+      }
+    ],
+    "Internal/other": [
+      {
+        "short": "150b577da",
+        "full": "150b577da52318ae14cddd934aa815291b117e14",
+        "date": "2026-05-17",
+        "subject": "chore(release): AUTHOR_MAP entries for batch salvage group 5 contributors",
+        "importance": "Medium"
+      },
+      {
+        "short": "cc59880ab",
+        "full": "cc59880ab01c2ca737cc3bad99de7cde8fd32f22",
+        "date": "2026-05-16",
+        "subject": "chore(release): map EloquentBrush0x email for #26642 salvage",
+        "importance": "Medium"
+      },
+      {
+        "short": "56ad30de1",
+        "full": "56ad30de1759484bf7d65b4dfdd1444658d1298e",
+        "date": "2026-05-16",
+        "subject": "Merge pull request #27248 from NousResearch/hermes/hermes-27dc9cc2",
+        "importance": "Medium"
+      },
+      {
+        "short": "408aa4fbc",
+        "full": "408aa4fbc4839b1f770849e4e28c700b6617d07e",
+        "date": "2026-05-16",
+        "subject": "port(refactor): deepseek thinking-mode (068c24f8a + cd9470f41) — no net change",
+        "importance": "Medium"
+      },
+      {
+        "short": "152d42d1a",
+        "full": "152d42d1a7314a8f7912e661547341dafd62a5fb",
+        "date": "2026-05-16",
+        "subject": "Merge origin/main into pr-27248 (resolving run_agent.py = ours)",
+        "importance": "Medium"
+      },
+      {
+        "short": "7322816ef",
+        "full": "7322816efa601737722c74147194f1f5ffd3ad07",
+        "date": "2026-05-16",
+        "subject": "chore(release): AUTHOR_MAP entries for batch salvage group 4 contributors",
+        "importance": "Medium"
+      },
+      {
+        "short": "35b7befc6",
+        "full": "35b7befc67315da5d4ce6b6a3daa4d9ba2f57c1c",
+        "date": "2026-05-16",
+        "subject": "fix(line): add trust_env=True to all _LineClient aiohttp sessions",
+        "importance": "High"
+      },
+      {
+        "short": "04bb30730",
+        "full": "04bb30730a66ff17fe3dcb509d6fd572da3eb014",
+        "date": "2026-05-16",
+        "subject": "chore(release): AUTHOR_MAP entries for batch salvage group 3 contributors",
+        "importance": "Medium"
+      },
+      {
+        "short": "8973b00ff",
+        "full": "8973b00ff3665a76b69ca17e57c8cd1a39b32d53",
+        "date": "2026-05-17",
+        "subject": "fix(scripts): fix UnicodeEncodeError in footgun checker on Windows",
+        "importance": "High"
+      },
+      {
+        "short": "e90a52dea",
+        "full": "e90a52deafcca5c6b1fc06b0ef427348ec796077",
+        "date": "2026-05-16",
+        "subject": "chore(release): AUTHOR_MAP entries for batch salvage group 2 contributors",
+        "importance": "Medium"
+      },
+      {
+        "short": "5f72dd817",
+        "full": "5f72dd817ec2709f6fda323ef96dc55e21dd3d0d",
+        "date": "2026-05-17",
+        "subject": "fix(install): use resolved python variable in setup_open_webui.sh",
+        "importance": "Medium"
+      },
+      {
+        "short": "a81cfd0a0",
+        "full": "a81cfd0a0a6de1c3028b9c800ae917d9bd7e5162",
+        "date": "2026-05-16",
+        "subject": "chore(release): map 0xchainer and kronexoi emails for upcoming salvages",
+        "importance": "Medium"
+      },
+      {
+        "short": "9f182bd7b",
+        "full": "9f182bd7b04f73e4508999017e20740272b036a8",
+        "date": "2026-05-16",
+        "subject": "Merge pull request #27251 from NousResearch/bb/skin-render-magenta-bleed",
+        "importance": "Medium"
+      },
+      {
+        "short": "96b7f3da4",
+        "full": "96b7f3da45931f2f0e8ce6eb880da24d2c44ac7e",
+        "date": "2026-05-16",
+        "subject": "chore(release): AUTHOR_MAP entries for batch salvage contributors",
+        "importance": "Medium"
+      }
+    ],
+    "Gateway/platforms": [
+      {
+        "short": "1856bd9cc",
+        "full": "1856bd9cc88a3790d7ccc7566aacd79ea2d1cd1c",
+        "date": "2026-05-15",
+        "subject": "fix(telegram): re-trigger typing indicator after sending messages",
+        "importance": "High"
+      },
+      {
+        "short": "5fba23664",
+        "full": "5fba236644a9c2aa18501fdef1484e5b6fecfb85",
+        "date": "2026-05-17",
+        "subject": "chore: ruff auto-fix PLR6201 resweep — tuple → set in membership tests (#27355)",
+        "importance": "High"
+      },
+      {
+        "short": "519657aa9",
+        "full": "519657aa98d4969ec9e23c70c074d1982ef3ccf1",
+        "date": "2026-05-17",
+        "subject": "fix(matrix): warn on clock-skew silent message drops (#12614) (#27330)",
+        "importance": "High"
+      },
+      {
+        "short": "5631345b1",
+        "full": "5631345b12aa5fa7ead11203624e646b42c8936f",
+        "date": "2026-05-16",
+        "subject": "[agent] fix: harden api server response headers",
+        "importance": "High"
+      },
+      {
+        "short": "0afab4a32",
+        "full": "0afab4a32b3b371ac3b5ab17d745aab823444ae3",
+        "date": "2026-05-14",
+        "subject": "feat(gateway): extract auto-TTS markdown strip into prepare_tts_text() hook",
+        "importance": "High"
+      },
+      {
+        "short": "a3017508b",
+        "full": "a3017508bf88e663c318495d191904020f77a0f5",
+        "date": "2026-05-16",
+        "subject": "fix(gateway): preserve underscores in plain-text identifiers",
+        "importance": "High"
+      },
+      {
+        "short": "fdd455bc5",
+        "full": "fdd455bc58b8708eb2c7e3e5d83efca3ec49e4a4",
+        "date": "2026-05-16",
+        "subject": "fix(gateway): avoid zsh status variable in update wrapper",
+        "importance": "High"
+      },
+      {
+        "short": "c1ae18ee8",
+        "full": "c1ae18ee815eba605c1b021e1b0b2a9c765b2d71",
+        "date": "2026-05-16",
+        "subject": "fix(gateway): add trust_env=True to aiohttp sessions in SMS, Slack, Teams, Google Chat adapters",
+        "importance": "High"
+      },
+      {
+        "short": "5338250da",
+        "full": "5338250dab14b3e4f9dfb306446e8c55835adfad",
+        "date": "2026-05-17",
+        "subject": "fix(gateway): add direct_messages_topic_id for synthetic Telegram DM events",
+        "importance": "High"
+      },
+      {
+        "short": "8d4766afc",
+        "full": "8d4766afcae676efba0269787ddad7c769ba6c24",
+        "date": "2026-05-16",
+        "subject": "fix(api_server): coerce stringified booleans in request payloads",
+        "importance": "High"
+      },
+      {
+        "short": "508b022ac",
+        "full": "508b022acb85b5b1395945e1b5f27e4706a81853",
+        "date": "2026-05-16",
+        "subject": "feat(gateway): add .ts/.py/.sh to SUPPORTED_DOCUMENT_TYPES",
+        "importance": "High"
+      },
+      {
+        "short": "60531889d",
+        "full": "60531889d56a9a9d2b3f0b9ee04aea4145ede392",
+        "date": "2026-05-17",
+        "subject": "fix: remove unused import and hoist module-level constant",
+        "importance": "High"
+      },
+      {
+        "short": "407a11b41",
+        "full": "407a11b4190d7a6ebbc6429d0481545abd86aadc",
+        "date": "2026-05-16",
+        "subject": "feat(discord): allow_any_attachment config to accept arbitrary file types",
+        "importance": "High"
+      },
+      {
+        "short": "e21cb8d14",
+        "full": "e21cb8d1457f603cda1dc8413efc400721d256e7",
+        "date": "2026-05-16",
+        "subject": "feat(status): append session recap to /status output (#27176)",
+        "importance": "High"
+      },
+      {
+        "short": "6f817e144",
+        "full": "6f817e1447499cf51d8c966b3f3a600ba3412f85",
+        "date": "2026-05-16",
+        "subject": "fix(telegram): restore DM topic typing indicator",
+        "importance": "High"
+      },
+      {
+        "short": "dc3d0fe14",
+        "full": "dc3d0fe1489aebd5747fa620d9b2eec751a92a55",
+        "date": "2026-05-16",
+        "subject": "Port from cline/cline#10343: periodic gateway memory logging (#27102)",
+        "importance": "High"
+      },
+      {
+        "short": "6c2406c5e",
+        "full": "6c2406c5e131dbbcabb69319c73c02594f63caea",
+        "date": "2026-05-16",
+        "subject": "fix(signal): read groupV2.id in envelope, fall back to legacy groupInfo (#27051)",
+        "importance": "High"
+      }
+    ],
+    "Dashboard/Web UI": [
+      {
+        "short": "8e3cfdfb6",
+        "full": "8e3cfdfb613ceb923ab9c07f8b88d4fa512b35b4",
+        "date": "2026-05-17",
+        "subject": "fix(webui): allow native text selection in chat via xterm.js bypass (#25720)",
+        "importance": "High"
+      },
+      {
+        "short": "5fba23664",
+        "full": "5fba236644a9c2aa18501fdef1484e5b6fecfb85",
+        "date": "2026-05-17",
+        "subject": "chore: ruff auto-fix PLR6201 resweep — tuple → set in membership tests (#27355)",
+        "importance": "High"
+      }
+    ],
+    "Install/dependencies": [
+      {
+        "short": "5fba23664",
+        "full": "5fba236644a9c2aa18501fdef1484e5b6fecfb85",
+        "date": "2026-05-17",
+        "subject": "chore: ruff auto-fix PLR6201 resweep — tuple → set in membership tests (#27355)",
+        "importance": "High"
+      },
+      {
+        "short": "fb138d91c",
+        "full": "fb138d91ca34c3e2e49ce67f3187da6feeedbbdd",
+        "date": "2026-05-16",
+        "subject": "fix(install.ps1): Stage-Node honest reporting + reject empty -Stage",
+        "importance": "High"
+      },
+      {
+        "short": "3925be279",
+        "full": "3925be2791038e29fc9d1fc10c3fd403a8d5bed7",
+        "date": "2026-05-16",
+        "subject": "fix(install.ps1): trim completion banner + strip em-dash in test",
+        "importance": "High"
+      },
+      {
+        "short": "c0b64f087",
+        "full": "c0b64f087750ea4a9fe11e32ad9cce21e9857e2d",
+        "date": "2026-05-17",
+        "subject": "fix(install.ps1): address Copilot review on #27224",
+        "importance": "High"
+      },
+      {
+        "short": "e5f19af2a",
+        "full": "e5f19af2a5cfed9ec7f6ea1e1f770f8a8b342de3",
+        "date": "2026-05-17",
+        "subject": "feat(install.ps1): stage protocol + Windows clean-VM hardening pass",
+        "importance": "High"
+      },
+      {
+        "short": "4279da4db",
+        "full": "4279da4db62a8a3cba7004c6fb1e1e53ea2c6a29",
+        "date": "2026-05-15",
+        "subject": "fix(windows): make PowerShell installer parse in 5.1",
+        "importance": "High"
+      },
+      {
+        "short": "05af78c53",
+        "full": "05af78c53d553f6dd20012ce18eb0c2c02d346c9",
+        "date": "2026-05-16",
+        "subject": "fix(update): make Camofox lazy-installed instead of eager (#27055)",
+        "importance": "High"
+      }
+    ],
+    "Kanban/multi-agent": [
+      {
+        "short": "5fba23664",
+        "full": "5fba236644a9c2aa18501fdef1484e5b6fecfb85",
+        "date": "2026-05-17",
+        "subject": "chore: ruff auto-fix PLR6201 resweep — tuple → set in membership tests (#27355)",
+        "importance": "High"
+      },
+      {
+        "short": "8bf09455d",
+        "full": "8bf09455dc498581fe6dea21402ee2a9238a2212",
+        "date": "2026-05-16",
+        "subject": "fix(windows): suppress console window flash on subprocess spawns",
+        "importance": "High"
+      },
+      {
+        "short": "1eadb069c",
+        "full": "1eadb069c794ecf0626ff5c785191e604ad1f6bc",
+        "date": "2026-05-16",
+        "subject": "fix(kanban): --severity filter uses >= comparison per documented behavior (#26379)",
+        "importance": "High"
+      }
+    ],
+    "Skills": [
+      {
+        "short": "5fba23664",
+        "full": "5fba236644a9c2aa18501fdef1484e5b6fecfb85",
+        "date": "2026-05-17",
+        "subject": "chore: ruff auto-fix PLR6201 resweep — tuple → set in membership tests (#27355)",
+        "importance": "High"
+      }
+    ],
+    "Docs": [
+      {
+        "short": "519657aa9",
+        "full": "519657aa98d4969ec9e23c70c074d1982ef3ccf1",
+        "date": "2026-05-17",
+        "subject": "fix(matrix): warn on clock-skew silent message drops (#12614) (#27330)",
+        "importance": "High"
+      },
+      {
+        "short": "32c3f06a5",
+        "full": "32c3f06a5bf0867d11d309503122f59d0dba75d9",
+        "date": "2026-05-16",
+        "subject": "docs(readme): remove hermes-eval and Hermes MemPalace from Community links (#27271)",
+        "importance": "Low"
+      },
+      {
+        "short": "903ac23bc",
+        "full": "903ac23bc879cbeb9d70b1941176a91cc736b643",
+        "date": "2026-05-15",
+        "subject": "docs(dashboard): clarify chat tab tui flag",
+        "importance": "High"
+      },
+      {
+        "short": "c741eacd0",
+        "full": "c741eacd0c1d81ec8db93bfe7e4cf8296d2f3d55",
+        "date": "2026-05-16",
+        "subject": "docs(spotify): document Home Assistant speaker routing",
+        "importance": "Low"
+      },
+      {
+        "short": "49bd95c43",
+        "full": "49bd95c43203a2264a7352acc47c35c34c8d5a65",
+        "date": "2026-05-16",
+        "subject": "docs(security): document YOLO mode visual indicators added in #26238",
+        "importance": "High"
+      },
+      {
+        "short": "6f7292a55",
+        "full": "6f7292a555b425005fc80190f9480bad305c7ba4",
+        "date": "2026-05-16",
+        "subject": "docs(cron): document name-based job lookup from #26231",
+        "importance": "High"
+      },
+      {
+        "short": "86f3776a7",
+        "full": "86f3776a7252126d1eed6651fe1fe6668b7ed85e",
+        "date": "2026-05-17",
+        "subject": "docs(delegation): document api_mode wire-protocol override from #26824",
+        "importance": "Low"
+      },
+      {
+        "short": "31a805883",
+        "full": "31a805883b1a39826f5faf13190d37164d3ba2ad",
+        "date": "2026-05-17",
+        "subject": "docs(delegation): show api_mode override in custom-endpoint example",
+        "importance": "Low"
+      },
+      {
+        "short": "d5ce85c42",
+        "full": "d5ce85c423af825bffb5333bfd433a805e29bdeb",
+        "date": "2026-05-14",
+        "subject": "docs: add computer-use-linux community MCP",
+        "importance": "High"
+      },
+      {
+        "short": "df80bda77",
+        "full": "df80bda77831abc8beec9dfdec0b9e39565b8b68",
+        "date": "2026-05-16",
+        "subject": "docs: add Hermes MemPalace to Community plugins section",
+        "importance": "High"
+      },
+      {
+        "short": "a1e3d7969",
+        "full": "a1e3d7969e4b448bb56073872f00e013098206a4",
+        "date": "2026-05-17",
+        "subject": "docs: add hermes-eval to Community section",
+        "importance": "High"
+      },
+      {
+        "short": "407a11b41",
+        "full": "407a11b4190d7a6ebbc6429d0481545abd86aadc",
+        "date": "2026-05-16",
+        "subject": "feat(discord): allow_any_attachment config to accept arbitrary file types",
+        "importance": "High"
+      },
+      {
+        "short": "8ab8bc2f0",
+        "full": "8ab8bc2f035ac4ed8b3b43ed2940ba3dc4589cc9",
+        "date": "2026-05-16",
+        "subject": "fix(plugins): remove unreachable hermes tools → Langfuse path",
+        "importance": "High"
+      },
+      {
+        "short": "9b82586c6",
+        "full": "9b82586c6b6dd628af273b3c6875e0142f798089",
+        "date": "2026-05-16",
+        "subject": "fix(plugins): surface category-namespaced plugins in hermes plugins list",
+        "importance": "Medium"
+      },
+      {
+        "short": "29b1bd0e2",
+        "full": "29b1bd0e20e5848e2be8de431a225174ab6a7fed",
+        "date": "2026-05-16",
+        "subject": "feat(cli): add `hermes send` to pipe script output to any messaging platform (#27188)",
+        "importance": "High"
+      },
+      {
+        "short": "fc03c95da",
+        "full": "fc03c95da13105807cb3b3f42a311e4916b456ce",
+        "date": "2026-05-16",
+        "subject": "feat(cli): add /exit --delete flag to remove session on quit (#27101)",
+        "importance": "High"
+      },
+      {
+        "short": "8a2b2b9f6",
+        "full": "8a2b2b9f6f9c419fdef48f542bf4b1991c655810",
+        "date": "2026-05-16",
+        "subject": "docs(release): expand v0.14.0 highlights with newcomer-friendly context (#27053)",
+        "importance": "Low"
+      },
+      {
+        "short": "35f25523c",
+        "full": "35f25523c60d9b1174c9a5d901e34f2300d81986",
+        "date": "2026-05-16",
+        "subject": "docs(tools): add video_generate / video_gen toolset to user-facing tool docs (#27050)",
+        "importance": "High"
+      },
+      {
+        "short": "683698742",
+        "full": "683698742852ce0455f3a07b12c772c786d5a2ae",
+        "date": "2026-05-16",
+        "subject": "docs(release): rewrite v0.14.0 highlights for excitement framing (#27035)",
+        "importance": "Low"
+      }
+    ],
+    "Cron/automation": [
+      {
+        "short": "7a7e78a36",
+        "full": "7a7e78a360464b30ba9e9a20525681977b0f2095",
+        "date": "2026-05-17",
+        "subject": "fix(cron): prevent parallel job result loss on exception",
+        "importance": "High"
+      }
+    ]
+  },
+  "recent_commits": [
+    {
+      "full": "f36c89cd5798da0f313192555739975e57ffdef5",
+      "short": "f36c89cd5",
+      "date": "2026-05-17",
+      "subject": "fix(plugins/browser): carry forward requests.RequestException wrapping",
+      "files": [
+        "plugins/browser/browser_use/provider.py",
+        "plugins/browser/browserbase/provider.py",
+        "plugins/browser/firecrawl/provider.py"
+      ],
+      "categories": [
+        "Core agent/model routing"
+      ],
+      "importance": "Medium",
+      "file_count": 3
+    },
+    {
+      "full": "c74ff2c8effce1615074820b03e0d13997c62bb5",
+      "short": "c74ff2c8e",
+      "date": "2026-05-14",
+      "subject": "fix(browser): self-review pass — dead-import, log levels, future-proofing",
+      "files": [
+        "agent/browser_provider.py",
+        "agent/browser_registry.py",
+        "plugins/browser/browser_use/provider.py",
+        "plugins/browser/firecrawl/provider.py",
+        "tests/plugins/browser/check_parity_vs_main.py",
+        "tests/tools/test_managed_browserbase_and_modal.py",
+        "tools/browser_tool.py"
+      ],
+      "categories": [
+        "Core agent/model routing",
+        "Tests/reliability",
+        "Tools/toolsets"
+      ],
+      "importance": "Medium",
+      "file_count": 7
+    },
+    {
+      "full": "1bb6f03724590e5755619e97d0fe580d2cc92f9e",
+      "short": "1bb6f0372",
+      "date": "2026-05-14",
+      "subject": "fix(browser): ensure plugin discovery before registry lookup; parity harness",
+      "files": [
+        "tests/plugins/browser/check_parity_vs_main.py",
+        "tools/browser_tool.py"
+      ],
+      "categories": [
+        "Tests/reliability",
+        "Tools/toolsets"
+      ],
+      "importance": "Medium",
+      "file_count": 2
+    },
+    {
+      "full": "fec0a0da985f42cab63141c9a6a09d2468144a00",
+      "short": "fec0a0da9",
+      "date": "2026-05-14",
+      "subject": "test(plugins/browser): coverage for the 3-plugin migration",
+      "files": [
+        "tests/plugins/browser/__init__.py",
+        "tests/plugins/browser/test_browser_provider_plugins.py"
+      ],
+      "categories": [
+        "Core agent/model routing",
+        "Tests/reliability"
+      ],
+      "importance": "Medium",
+      "file_count": 2
+    },
+    {
+      "full": "250caebeb18c2445f8f67db4eff1e08718273ff7",
+      "short": "250caebeb",
+      "date": "2026-05-14",
+      "subject": "refactor(browser): delete tools/browser_providers/ directory; migrate tests",
+      "files": [
+        "tests/tools/test_managed_browserbase_and_modal.py",
+        "tools/browser_providers/__init__.py",
+        "tools/browser_providers/base.py",
+        "tools/browser_providers/browser_use.py",
+        "tools/browser_providers/browserbase.py",
+        "tools/browser_providers/firecrawl.py"
+      ],
+      "categories": [
+        "Core agent/model routing",
+        "Tests/reliability",
+        "Tools/toolsets"
+      ],
+      "importance": "High",
+      "file_count": 6
+    },
+    {
+      "full": "1b9c539c6e2eaf921b040b706494ce27d409e36c",
+      "short": "1b9c539c6",
+      "date": "2026-05-14",
+      "subject": "feat(tools): mirror image_gen plugin-injection in Browser Automation picker",
+      "files": [
+        "hermes_cli/tools_config.py"
+      ],
+      "categories": [
+        "CLI/TUI"
+      ],
+      "importance": "High",
+      "file_count": 1
+    },
+    {
+      "full": "40fde853fa6a84bf129a3f0958d15974887ccc78",
+      "short": "40fde853f",
+      "date": "2026-05-14",
+      "subject": "refactor(browser): dispatch _get_cloud_provider through agent.browser_registry",
+      "files": [
+        "agent/browser_provider.py",
+        "tests/tools/test_managed_browserbase_and_modal.py",
+        "tools/browser_tool.py"
+      ],
+      "categories": [
+        "Core agent/model routing",
+        "Tests/reliability",
+        "Tools/toolsets"
+      ],
+      "importance": "High",
+      "file_count": 3
+    },
+    {
+      "full": "a15cdfb0509db31b094aa0ff034b2432c43bc6e1",
+      "short": "a15cdfb05",
+      "date": "2026-05-14",
+      "subject": "feat(browser): browser-use + firecrawl plugins; drop single-eligible shortcut",
+      "files": [
+        "agent/browser_registry.py",
+        "plugins/browser/browser_use/__init__.py",
+        "plugins/browser/browser_use/plugin.yaml",
+        "plugins/browser/browser_use/provider.py",
+        "plugins/browser/firecrawl/__init__.py",
+        "plugins/browser/firecrawl/plugin.yaml",
+        "plugins/browser/firecrawl/provider.py"
+      ],
+      "categories": [
+        "Core agent/model routing"
+      ],
+      "importance": "High",
+      "file_count": 7
+    },
+    {
+      "full": "b8138ac4054935e117e2a5b2042fe9f01bb06e09",
+      "short": "b8138ac40",
+      "date": "2026-05-14",
+      "subject": "feat(browser): browserbase plugin (spike — first migration)",
+      "files": [
+        "plugins/browser/browserbase/__init__.py",
+        "plugins/browser/browserbase/plugin.yaml",
+        "plugins/browser/browserbase/provider.py"
+      ],
+      "categories": [
+        "Core agent/model routing"
+      ],
+      "importance": "High",
+      "file_count": 3
+    },
+    {
+      "full": "c6e6909e5a18f4c1a83eb48f0297e47fd17feed6",
+      "short": "c6e6909e5",
+      "date": "2026-05-14",
+      "subject": "feat(browser): add BrowserProvider ABC mirroring web_search_provider template",
+      "files": [
+        "agent/browser_provider.py",
+        "agent/browser_registry.py",
+        "hermes_cli/plugins.py"
+      ],
+      "categories": [
+        "CLI/TUI",
+        "Core agent/model routing"
+      ],
+      "importance": "High",
+      "file_count": 3
+    },
+    {
+      "full": "150b577da52318ae14cddd934aa815291b117e14",
+      "short": "150b577da",
+      "date": "2026-05-17",
+      "subject": "chore(release): AUTHOR_MAP entries for batch salvage group 5 contributors",
+      "files": [
+        "scripts/release.py"
+      ],
+      "categories": [
+        "Internal/other"
+      ],
+      "importance": "Medium",
+      "file_count": 1
+    },
+    {
+      "full": "c02606a385bd03630b7c76b72bf82f686a51f907",
+      "short": "c02606a38",
+      "date": "2026-05-17",
+      "subject": "chore(deps): lazy-install boto3/botocore for bedrock adapter",
+      "files": [
+        "agent/bedrock_adapter.py"
+      ],
+      "categories": [
+        "Core agent/model routing"
+      ],
+      "importance": "Medium",
+      "file_count": 1
+    },
+    {
+      "full": "1856bd9cc88a3790d7ccc7566aacd79ea2d1cd1c",
+      "short": "1856bd9cc",
+      "date": "2026-05-15",
+      "subject": "fix(telegram): re-trigger typing indicator after sending messages",
+      "files": [
+        "gateway/platforms/telegram.py"
+      ],
+      "categories": [
+        "Gateway/platforms"
+      ],
+      "importance": "High",
+      "file_count": 1
+    },
+    {
+      "full": "c9298bba06e91350aac4af8bc450b4c4f4fb225c",
+      "short": "c9298bba0",
+      "date": "2026-05-16",
+      "subject": "fix(doctor): SSH check ignores TERMINAL_SSH_USER, TERMINAL_SSH_PORT, TERMINAL_SSH_KEY",
+      "files": [
+        "hermes_cli/doctor.py"
+      ],
+      "categories": [
+        "CLI/TUI"
+      ],
+      "importance": "Medium",
+      "file_count": 1
+    },
+    {
+      "full": "dbeaaa47f2df6ce11906ab9cdf386e80b3a0a427",
+      "short": "dbeaaa47f",
+      "date": "2026-05-17",
+      "subject": "refactor(security): extract _block_message helper to unify block logic in _parse_response",
+      "files": [
+        "agent/shell_hooks.py"
+      ],
+      "categories": [
+        "Core agent/model routing"
+      ],
+      "importance": "High",
+      "file_count": 1
+    },
+    {
+      "full": "63805965e7a907f6b5e3a687fc37bed2004e7634",
+      "short": "63805965e",
+      "date": "2026-05-17",
+      "subject": "fix(security): restore type safety and extract constant in shell hook block handler",
+      "files": [
+        "agent/shell_hooks.py",
+        "tests/agent/test_shell_hooks.py"
+      ],
+      "categories": [
+        "Core agent/model routing",
+        "Tests/reliability"
+      ],
+      "importance": "High",
+      "file_count": 2
+    },
+    {
+      "full": "aeda146112c840372ae6f091c28d6379d8db6509",
+      "short": "aeda14611",
+      "date": "2026-05-17",
+      "subject": "fix(security): honor shell hook blocks even when message/reason is absent",
+      "files": [
+        "agent/shell_hooks.py"
+      ],
+      "categories": [
+        "Core agent/model routing"
+      ],
+      "importance": "High",
+      "file_count": 1
+    },
+    {
+      "full": "8e3cfdfb613ceb923ab9c07f8b88d4fa512b35b4",
+      "short": "8e3cfdfb6",
+      "date": "2026-05-17",
+      "subject": "fix(webui): allow native text selection in chat via xterm.js bypass (#25720)",
+      "files": [
+        "web/src/pages/ChatPage.tsx"
+      ],
+      "categories": [
+        "Dashboard/Web UI"
+      ],
+      "importance": "High",
+      "file_count": 1
+    },
+    {
+      "full": "6622277f11ca1dee03e868b064fb1851e5598b77",
+      "short": "6622277f1",
+      "date": "2026-05-15",
+      "subject": "fix ACP start events for polished tools",
+      "files": [
+        "acp_adapter/tools.py",
+        "tests/acp/test_tools.py"
+      ],
+      "categories": [
+        "Tests/reliability"
+      ],
+      "importance": "High",
+      "file_count": 2
+    },
+    {
+      "full": "3c51da1cb709566cfd3f29b5d3405a7826e97ced",
+      "short": "3c51da1cb",
+      "date": "2026-05-17",
+      "subject": "fix(cli): sync _skill_commands after /reload-skills so Tab completion picks up new skills",
+      "files": [
+        "cli.py"
+      ],
+      "categories": [
+        "CLI/TUI"
+      ],
+      "importance": "Medium",
+      "file_count": 1
+    },
+    {
+      "full": "d9abbe7fa4c69333a226b7a2d366713b3f071187",
+      "short": "d9abbe7fa",
+      "date": "2026-05-17",
+      "subject": "fix(metadata): qwen3.6-plus has a 1M context window (#27008)",
+      "files": [
+        "agent/model_metadata.py",
+        "tests/agent/test_model_metadata.py"
+      ],
+      "categories": [
+        "Core agent/model routing",
+        "Tests/reliability"
+      ],
+      "importance": "Medium",
+      "file_count": 2
+    },
+    {
+      "full": "5a2a858b84c3e189c7d4ab7db94205c0a2ef480f",
+      "short": "5a2a858b8",
+      "date": "2026-05-17",
+      "subject": "test(restart_drain): assert i18n catalog resolved (#22266)",
+      "files": [
+        "tests/gateway/test_restart_drain.py"
+      ],
+      "categories": [
+        "Tests/reliability"
+      ],
+      "importance": "Low",
+      "file_count": 1
+    },
+    {
+      "full": "d87b27cff86fe5dcf07cbdb073608674f8b92b3c",
+      "short": "d87b27cff",
+      "date": "2026-05-14",
+      "subject": "fix(gateway): add codex runtime telegram alias",
+      "files": [
+        "hermes_cli/commands.py",
+        "tests/hermes_cli/test_commands.py"
+      ],
+      "categories": [
+        "CLI/TUI",
+        "Tests/reliability"
+      ],
+      "importance": "High",
+      "file_count": 2
+    },
+    {
+      "full": "5fba236644a9c2aa18501fdef1484e5b6fecfb85",
+      "short": "5fba23664",
+      "date": "2026-05-17",
+      "subject": "chore: ruff auto-fix PLR6201 resweep — tuple → set in membership tests (#27355)",
+      "files": [
+        "agent/lsp/client.py",
+        "agent/lsp/install.py",
+        "agent/lsp/manager.py",
+        "agent/lsp/reporter.py",
+        "agent/lsp/servers.py",
+        "agent/transports/codex_app_server_session.py",
+        "cli.py",
+        "gateway/platforms/discord.py",
+        "gateway/run.py",
+        "hermes_cli/auth.py"
+      ],
+      "categories": [
+        "CLI/TUI",
+        "Core agent/model routing",
+        "Dashboard/Web UI",
+        "Gateway/platforms",
+        "Install/dependencies",
+        "Kanban/multi-agent",
+        "Skills",
+        "Tests/reliability",
+        "Tools/toolsets"
+      ],
+      "importance": "High",
+      "file_count": 119
+    },
+    {
+      "full": "ad00777f042d9c2ca23f1575ef1036a5b59d6195",
+      "short": "ad00777f0",
+      "date": "2026-05-16",
+      "subject": "fix(mcp-oauth): print SSH tunnel hint in _redirect_handler",
+      "files": [
+        "tests/tools/test_mcp_oauth.py",
+        "tools/mcp_oauth.py"
+      ],
+      "categories": [
+        "Tests/reliability",
+        "Tools/toolsets"
+      ],
+      "importance": "High",
+      "file_count": 2
+    },
+    {
+      "full": "cc59880ab01c2ca737cc3bad99de7cde8fd32f22",
+      "short": "cc59880ab",
+      "date": "2026-05-16",
+      "subject": "chore(release): map EloquentBrush0x email for #26642 salvage",
+      "files": [
+        "scripts/release.py"
+      ],
+      "categories": [
+        "Internal/other"
+      ],
+      "importance": "Medium",
+      "file_count": 1
+    },
+    {
+      "full": "a9ba636d535faa6aaf928f5c6c575209bb292f58",
+      "short": "a9ba636d5",
+      "date": "2026-05-16",
+      "subject": "fix(tools): run post_setup in _reconfigure_provider() for env-var providers",
+      "files": [
+        "hermes_cli/tools_config.py",
+        "tests/hermes_cli/test_tools_config.py"
+      ],
+      "categories": [
+        "CLI/TUI",
+        "Tests/reliability"
+      ],
+      "importance": "High",
+      "file_count": 2
+    },
+    {
+      "full": "ad1aa1a037a0603b09593dfdce1efd8111936c8f",
+      "short": "ad1aa1a03",
+      "date": "2026-05-17",
+      "subject": "feat(x_search): auto-enable toolset when xAI OAuth or XAI_API_KEY is configured (#27376)",
+      "files": [
+        "hermes_cli/tools_config.py",
+        "tests/hermes_cli/test_tools_config.py"
+      ],
+      "categories": [
+        "CLI/TUI",
+        "Tests/reliability"
+      ],
+      "importance": "High",
+      "file_count": 2
+    },
+    {
+      "full": "519657aa98d4969ec9e23c70c074d1982ef3ccf1",
+      "short": "519657aa9",
+      "date": "2026-05-17",
+      "subject": "fix(matrix): warn on clock-skew silent message drops (#12614) (#27330)",
+      "files": [
+        "gateway/platforms/matrix.py",
+        "tests/gateway/test_matrix.py",
+        "website/docs/user-guide/messaging/matrix.md"
+      ],
+      "categories": [
+        "Docs",
+        "Gateway/platforms",
+        "Tests/reliability"
+      ],
+      "importance": "High",
+      "file_count": 3
+    },
+    {
+      "full": "56ad30de1759484bf7d65b4dfdd1444658d1298e",
+      "short": "56ad30de1",
+      "date": "2026-05-16",
+      "subject": "Merge pull request #27248 from NousResearch/hermes/hermes-27dc9cc2",
+      "files": [],
+      "categories": [
+        "Internal/other"
+      ],
+      "importance": "Medium",
+      "file_count": 0
+    },
+    {
+      "full": "563b4d9e51a46cc421e327b351cb7efe1ccb151b",
+      "short": "563b4d9e5",
+      "date": "2026-05-16",
+      "subject": "fix: strip image parts for non-vision models with provider profiles + getattr-safe _custom_providers",
+      "files": [
+        "agent/chat_completion_helpers.py"
+      ],
+      "categories": [
+        "Core agent/model routing"
+      ],
+      "importance": "High",
+      "file_count": 1
+    },
+    {
+      "full": "36ad8336f9fcf2fe03f43782281cc7a555cbc6ed",
+      "short": "36ad8336f",
+      "date": "2026-05-16",
+      "subject": "fix(run_agent): guard memory provider init against empty/whitespace string",
+      "files": [
+        "agent/agent_init.py"
+      ],
+      "categories": [
+        "Core agent/model routing"
+      ],
+      "importance": "High",
+      "file_count": 1
+    },
+    {
+      "full": "4ece521bcf37401686e73f1d08ebaa87caaae05a",
+      "short": "4ece521bc",
+      "date": "2026-05-16",
+      "subject": "fix(run_agent): isolate background review fork from external memory plugins (#27190)",
+      "files": [
+        "agent/background_review.py"
+      ],
+      "categories": [
+        "Core agent/model routing"
+      ],
+      "importance": "Medium",
+      "file_count": 1
+    },
+    {
+      "full": "b5bcffe1674fa9ab3ba7a754c07ab77bedde83a8",
+      "short": "b5bcffe16",
+      "date": "2026-05-16",
+      "subject": "fix(fallback): forward custom_providers to fallback model context-length detection",
+      "files": [
+        "agent/chat_completion_helpers.py"
+      ],
+      "categories": [
+        "Core agent/model routing"
+      ],
+      "importance": "High",
+      "file_count": 1
+    },
+    {
+      "full": "4ab9a06a51268a2864cc66ee36ef34bf6f9ef6e8",
+      "short": "4ab9a06a5",
+      "date": "2026-05-16",
+      "subject": "fix(agent): reset _fallback_index at turn start even when no fallback activated",
+      "files": [
+        "agent/agent_runtime_helpers.py"
+      ],
+      "categories": [
+        "Core agent/model routing"
+      ],
+      "importance": "Medium",
+      "file_count": 1
+    },
+    {
+      "full": "aa05ffba530fde599b6515120578364cce682ac7",
+      "short": "aa05ffba5",
+      "date": "2026-05-16",
+      "subject": "fix(xai): surface provider 'error' SSE frame in Codex fallback stream (#27184)",
+      "files": [
+        "agent/codex_runtime.py",
+        "run_agent.py"
+      ],
+      "categories": [
+        "Core agent/model routing"
+      ],
+      "importance": "High",
+      "file_count": 2
+    },
+    {
+      "full": "80fa92a491c67ae98c43ea723487db640d99857f",
+      "short": "80fa92a49",
+      "date": "2026-05-16",
+      "subject": "fix(codex): rotate pool on usage limit 429 — port to extracted modules",
+      "files": [
+        "agent/agent_runtime_helpers.py"
+      ],
+      "categories": [
+        "Core agent/model routing"
+      ],
+      "importance": "Medium",
+      "file_count": 1
+    },
+    {
+      "full": "df22d29522ced894ab79ff66e4496c2c93be65c4",
+      "short": "df22d2952",
+      "date": "2026-05-16",
+      "subject": "fix(copilot): GitHub Models 413 hint — port to extracted conversation_loop",
+      "files": [
+        "agent/conversation_loop.py"
+      ],
+      "categories": [
+        "Core agent/model routing"
+      ],
+      "importance": "High",
+      "file_count": 1
+    },
+    {
+      "full": "3fbedd732e5179759d797927fd0f2cf4324682b2",
+      "short": "3fbedd732",
+      "date": "2026-05-16",
+      "subject": "feat: add supports_parallel_tool_calls for MCP servers (#26825) — port to tool_dispatch_helpers",
+      "files": [
+        "agent/tool_dispatch_helpers.py"
+      ],
+      "categories": [
+        "Core agent/model routing"
+      ],
+      "importance": "High",
+      "file_count": 1
+    },
+    {
+      "full": "fe4c87eb28907c467f60335d75680a50e77b15c9",
+      "short": "fe4c87eb2",
+      "date": "2026-05-16",
+      "subject": "fix(agent): retry malformed anthropic stream parser errors — port to extracted modules",
+      "files": [
+        "agent/chat_completion_helpers.py",
+        "run_agent.py"
+      ],
+      "categories": [
+        "Core agent/model routing"
+      ],
+      "importance": "Medium",
+      "file_count": 2
+    },
+    {
+      "full": "f885be030cc2521a4dd20122c66f411f9c1377e5",
+      "short": "f885be030",
+      "date": "2026-05-16",
+      "subject": "fix(auxiliary): resolve xai oauth compression from pool — port to conversation_compression",
+      "files": [
+        "agent/conversation_compression.py"
+      ],
+      "categories": [
+        "Core agent/model routing"
+      ],
+      "importance": "High",
+      "file_count": 1
+    },
+    {
+      "full": "6975a2d9ae20c5131c4fd3b3758dc9eade8cc6a0",
+      "short": "6975a2d9a",
+      "date": "2026-05-16",
+      "subject": "fix(xai-oauth): entitlement-403 chain — final state (ce0e189d3 + 9818b9a1a + 6784c8079 + dffb602f3)",
+      "files": [
+        "agent/agent_runtime_helpers.py",
+        "run_agent.py"
+      ],
+      "categories": [
+        "Core agent/model routing"
+      ],
+      "importance": "High",
+      "file_count": 2
+    },
+    {
+      "full": "408aa4fbc4839b1f770849e4e28c700b6617d07e",
+      "short": "408aa4fbc",
+      "date": "2026-05-16",
+      "subject": "port(refactor): deepseek thinking-mode (068c24f8a + cd9470f41) — no net change",
+      "files": [],
+      "categories": [
+        "Internal/other"
+      ],
+      "importance": "Medium",
+      "file_count": 0
+    },
+    {
+      "full": "6362e71973c18b407651157f818e279122ce41f6",
+      "short": "6362e7197",
+      "date": "2026-05-16",
+      "subject": "fix(xai-oauth): recover from prelude SSE errors, gate reasoning replay, surface entitlement 403s",
+      "files": [
+        "agent/codex_runtime.py",
+        "run_agent.py"
+      ],
+      "categories": [
+        "Core agent/model routing"
+      ],
+      "importance": "High",
+      "file_count": 2
+    },
+    {
+      "full": "27df249564b3ce6fa4d1db883df0329bfda01593",
+      "short": "27df24956",
+      "date": "2026-05-16",
+      "subject": "feat(nvidia): add NIM billing origin header — port to extracted modules",
+      "files": [
+        "agent/agent_init.py",
+        "run_agent.py"
+      ],
+      "categories": [
+        "Core agent/model routing"
+      ],
+      "importance": "High",
+      "file_count": 2
+    },
+    {
+      "full": "b07524e53aed5e8629b98ce3bbf3a54a27d596f4",
+      "short": "b07524e53",
+      "date": "2026-05-16",
+      "subject": "feat(xai-oauth): add xAI Grok OAuth (SuperGrok Subscription) provider — port to extracted modules",
+      "files": [
+        "agent/agent_init.py",
+        "agent/chat_completion_helpers.py",
+        "agent/conversation_loop.py",
+        "run_agent.py"
+      ],
+      "categories": [
+        "Core agent/model routing"
+      ],
+      "importance": "High",
+      "file_count": 4
+    },
+    {
+      "full": "7d221aa1f288a96a11485845923266499f5a3abb",
+      "short": "7d221aa1f",
+      "date": "2026-05-16",
+      "subject": "fix(langfuse): complete observability fix — port to extracted conversation_loop",
+      "files": [
+        "agent/conversation_loop.py"
+      ],
+      "categories": [
+        "Core agent/model routing"
+      ],
+      "importance": "Medium",
+      "file_count": 1
+    },
+    {
+      "full": "a77ca9295e96af9f0da522b1bd3afe1965ef21ee",
+      "short": "a77ca9295",
+      "date": "2026-05-16",
+      "subject": "perf(run_agent): accumulate length-continuation prefix via list+join",
+      "files": [
+        "agent/conversation_loop.py"
+      ],
+      "categories": [
+        "Core agent/model routing"
+      ],
+      "importance": "Medium",
+      "file_count": 1
+    },
+    {
+      "full": "94b3131be7115709c516a79be7c3d01dd71761a8",
+      "short": "94b3131be",
+      "date": "2026-05-16",
+      "subject": "fix(run_agent): detect kimi models via model name for reasoning pad",
+      "files": [
+        "run_agent.py"
+      ],
+      "categories": [
+        "Core agent/model routing"
+      ],
+      "importance": "High",
+      "file_count": 1
+    },
+    {
+      "full": "8f3bc17db9ebe1d9108ae69b14fcc3f06734554b",
+      "short": "8f3bc17db",
+      "date": "2026-05-14",
+      "subject": "feat(agent): Added gemma 4 to reasoning allowlist",
+      "files": [
+        "run_agent.py"
+      ],
+      "categories": [
+        "Core agent/model routing"
+      ],
+      "importance": "High",
+      "file_count": 1
+    },
+    {
+      "full": "152d42d1a7314a8f7912e661547341dafd62a5fb",
+      "short": "152d42d1a",
+      "date": "2026-05-16",
+      "subject": "Merge origin/main into pr-27248 (resolving run_agent.py = ours)",
+      "files": [],
+      "categories": [
+        "Internal/other"
+      ],
+      "importance": "Medium",
+      "file_count": 0
+    },
+    {
+      "full": "7322816efa601737722c74147194f1f5ffd3ad07",
+      "short": "7322816ef",
+      "date": "2026-05-16",
+      "subject": "chore(release): AUTHOR_MAP entries for batch salvage group 4 contributors",
+      "files": [
+        "scripts/release.py"
+      ],
+      "categories": [
+        "Internal/other"
+      ],
+      "importance": "Medium",
+      "file_count": 1
+    },
+    {
+      "full": "35b7befc67315da5d4ce6b6a3daa4d9ba2f57c1c",
+      "short": "35b7befc6",
+      "date": "2026-05-16",
+      "subject": "fix(line): add trust_env=True to all _LineClient aiohttp sessions",
+      "files": [
+        "plugins/platforms/line/adapter.py"
+      ],
+      "categories": [
+        "Internal/other"
+      ],
+      "importance": "High",
+      "file_count": 1
+    },
+    {
+      "full": "52c89715a29198d838dac54e229aba9cf328e408",
+      "short": "52c89715a",
+      "date": "2026-05-16",
+      "subject": "fix: respect user-configured vision model for OpenRouter",
+      "files": [
+        "agent/auxiliary_client.py"
+      ],
+      "categories": [
+        "Core agent/model routing"
+      ],
+      "importance": "High",
+      "file_count": 1
+    },
+    {
+      "full": "5631345b12aa5fa7ead11203624e646b42c8936f",
+      "short": "5631345b1",
+      "date": "2026-05-16",
+      "subject": "[agent] fix: harden api server response headers",
+      "files": [
+        "gateway/platforms/api_server.py",
+        "tests/gateway/test_api_server.py"
+      ],
+      "categories": [
+        "Gateway/platforms",
+        "Tests/reliability"
+      ],
+      "importance": "High",
+      "file_count": 2
+    },
+    {
+      "full": "b389796ae3a33256ff1b4077acc1169831fb63e1",
+      "short": "b389796ae",
+      "date": "2026-05-14",
+      "subject": "fix(auxiliary): resolve api_key_env alias in named custom provider path of resolve_provider_client",
+      "files": [
+        "agent/auxiliary_client.py"
+      ],
+      "categories": [
+        "Core agent/model routing"
+      ],
+      "importance": "High",
+      "file_count": 1
+    },
+    {
+      "full": "0afab4a32b3b371ac3b5ab17d745aab823444ae3",
+      "short": "0afab4a32",
+      "date": "2026-05-14",
+      "subject": "feat(gateway): extract auto-TTS markdown strip into prepare_tts_text() hook",
+      "files": [
+        "gateway/platforms/base.py"
+      ],
+      "categories": [
+        "Gateway/platforms"
+      ],
+      "importance": "High",
+      "file_count": 1
+    },
+    {
+      "full": "a3017508bf88e663c318495d191904020f77a0f5",
+      "short": "a3017508b",
+      "date": "2026-05-16",
+      "subject": "fix(gateway): preserve underscores in plain-text identifiers",
+      "files": [
+        "gateway/platforms/helpers.py",
+        "tests/gateway/test_bluebubbles.py"
+      ],
+      "categories": [
+        "Gateway/platforms",
+        "Tests/reliability"
+      ],
+      "importance": "High",
+      "file_count": 2
+    },
+    {
+      "full": "364a1dd290245093f76837c6074bb7d4fdc798c6",
+      "short": "364a1dd29",
+      "date": "2026-05-16",
+      "subject": "Local: doctor uses x-goog-api-key for Google generativelanguage endpoint",
+      "files": [
+        "hermes_cli/doctor.py"
+      ],
+      "categories": [
+        "CLI/TUI"
+      ],
+      "importance": "Medium",
+      "file_count": 1
+    },
+    {
+      "full": "fdd455bc58b8708eb2c7e3e5d83efca3ec49e4a4",
+      "short": "fdd455bc5",
+      "date": "2026-05-16",
+      "subject": "fix(gateway): avoid zsh status variable in update wrapper",
+      "files": [
+        "gateway/run.py",
+        "tests/gateway/test_update_streaming.py"
+      ],
+      "categories": [
+        "Gateway/platforms",
+        "Tests/reliability"
+      ],
+      "importance": "High",
+      "file_count": 2
+    },
+    {
+      "full": "c1ae18ee815eba605c1b021e1b0b2a9c765b2d71",
+      "short": "c1ae18ee8",
+      "date": "2026-05-16",
+      "subject": "fix(gateway): add trust_env=True to aiohttp sessions in SMS, Slack, Teams, Google Chat adapters",
+      "files": [
+        "gateway/platforms/slack.py",
+        "gateway/platforms/sms.py",
+        "plugins/platforms/google_chat/adapter.py",
+        "plugins/platforms/teams/adapter.py"
+      ],
+      "categories": [
+        "Gateway/platforms"
+      ],
+      "importance": "High",
+      "file_count": 4
+    },
+    {
+      "full": "04bb30730a66ff17fe3dcb509d6fd572da3eb014",
+      "short": "04bb30730",
+      "date": "2026-05-16",
+      "subject": "chore(release): AUTHOR_MAP entries for batch salvage group 3 contributors",
+      "files": [
+        "scripts/release.py"
+      ],
+      "categories": [
+        "Internal/other"
+      ],
+      "importance": "Medium",
+      "file_count": 1
+    },
+    {
+      "full": "8973b00ff3665a76b69ca17e57c8cd1a39b32d53",
+      "short": "8973b00ff",
+      "date": "2026-05-17",
+      "subject": "fix(scripts): fix UnicodeEncodeError in footgun checker on Windows",
+      "files": [
+        "scripts/check-windows-footguns.py"
+      ],
+      "categories": [
+        "Internal/other"
+      ],
+      "importance": "High",
+      "file_count": 1
+    },
+    {
+      "full": "a52f014a8cdefb72d81ca0e1d1208571dc3512d2",
+      "short": "a52f014a8",
+      "date": "2026-05-15",
+      "subject": "fix(tests): mock keychain in TestReadClaudeCodeCredentials to prevent credential leakage",
+      "files": [
+        "tests/agent/test_anthropic_adapter.py"
+      ],
+      "categories": [
+        "Tests/reliability"
+      ],
+      "importance": "Low",
+      "file_count": 1
+    },
+    {
+      "full": "7a7e78a360464b30ba9e9a20525681977b0f2095",
+      "short": "7a7e78a36",
+      "date": "2026-05-17",
+      "subject": "fix(cron): prevent parallel job result loss on exception",
+      "files": [
+        "cron/scheduler.py"
+      ],
+      "categories": [
+        "Cron/automation"
+      ],
+      "importance": "High",
+      "file_count": 1
+    },
+    {
+      "full": "6158964ff69c0c3ec0ee37fd5de5221b65ac7bcf",
+      "short": "6158964ff",
+      "date": "2026-05-16",
+      "subject": "feat: inject current time into goal judge prompt",
+      "files": [
+        "hermes_cli/goals.py"
+      ],
+      "categories": [
+        "CLI/TUI"
+      ],
+      "importance": "High",
+      "file_count": 1
+    },
+    {
+      "full": "6f50c26b2a0254275e8f79a30e8c950cece81ed5",
+      "short": "6f50c26b2",
+      "date": "2026-05-16",
+      "subject": "fix(model-switch): probe /models for custom providers without api_key",
+      "files": [
+        "hermes_cli/model_switch.py"
+      ],
+      "categories": [
+        "CLI/TUI"
+      ],
+      "importance": "High",
+      "file_count": 1
+    },
+    {
+      "full": "8bf09455dc498581fe6dea21402ee2a9238a2212",
+      "short": "8bf09455d",
+      "date": "2026-05-16",
+      "subject": "fix(windows): suppress console window flash on subprocess spawns",
+      "files": [
+        "hermes_cli/kanban_db.py",
+        "tools/code_execution_tool.py",
+        "tools/environments/local.py",
+        "tools/process_registry.py"
+      ],
+      "categories": [
+        "CLI/TUI",
+        "Kanban/multi-agent",
+        "Tools/toolsets"
+      ],
+      "importance": "High",
+      "file_count": 4
+    },
+    {
+      "full": "5338250dab14b3e4f9dfb306446e8c55835adfad",
+      "short": "5338250da",
+      "date": "2026-05-17",
+      "subject": "fix(gateway): add direct_messages_topic_id for synthetic Telegram DM events",
+      "files": [
+        "gateway/run.py"
+      ],
+      "categories": [
+        "Gateway/platforms"
+      ],
+      "importance": "High",
+      "file_count": 1
+    },
+    {
+      "full": "75e5d0f6bd412ff4ae719a6ebd98bfd5a471f66c",
+      "short": "75e5d0f6b",
+      "date": "2026-05-16",
+      "subject": "fix: strip image parts for non-vision models with provider profiles",
+      "files": [
+        "run_agent.py"
+      ],
+      "categories": [
+        "Core agent/model routing"
+      ],
+      "importance": "High",
+      "file_count": 1
+    },
+    {
+      "full": "bde3c7982c30796f8709cb0041d34ab36a4d7a9c",
+      "short": "bde3c7982",
+      "date": "2026-05-16",
+      "subject": "fix: preserve discover_models in _normalize_custom_provider_entry",
+      "files": [
+        "hermes_cli/config.py"
+      ],
+      "categories": [
+        "CLI/TUI"
+      ],
+      "importance": "High",
+      "file_count": 1
+    },
+    {
+      "full": "8d4766afcae676efba0269787ddad7c769ba6c24",
+      "short": "8d4766afc",
+      "date": "2026-05-16",
+      "subject": "fix(api_server): coerce stringified booleans in request payloads",
+      "files": [
+        "gateway/platforms/api_server.py",
+        "tests/gateway/test_api_server.py",
+        "tests/gateway/test_api_server_runs.py"
+      ],
+      "categories": [
+        "Gateway/platforms",
+        "Tests/reliability"
+      ],
+      "importance": "High",
+      "file_count": 3
+    },
+    {
+      "full": "47823790b00255b54c999b9559df2617f18b1df5",
+      "short": "47823790b",
+      "date": "2026-05-16",
+      "subject": "refactor(run_agent): review fixes — keyword-forward __init__, drop dead code, tighten guards",
+      "files": [
+        "agent/codex_runtime.py",
+        "run_agent.py",
+        "tests/run_agent/test_jsondecodeerror_retryable.py",
+        "tests/run_agent/test_memory_nudge_counter_hydration.py",
+        "tests/run_agent/test_run_agent.py"
+      ],
+      "categories": [
+        "Core agent/model routing",
+        "Tests/reliability"
+      ],
+      "importance": "Medium",
+      "file_count": 5
+    },
+    {
+      "full": "fb138d91ca34c3e2e49ce67f3187da6feeedbbdd",
+      "short": "fb138d91c",
+      "date": "2026-05-16",
+      "subject": "fix(install.ps1): Stage-Node honest reporting + reject empty -Stage",
+      "files": [
+        "scripts/install.ps1"
+      ],
+      "categories": [
+        "Install/dependencies"
+      ],
+      "importance": "High",
+      "file_count": 1
+    },
+    {
+      "full": "3925be2791038e29fc9d1fc10c3fd403a8d5bed7",
+      "short": "3925be279",
+      "date": "2026-05-16",
+      "subject": "fix(install.ps1): trim completion banner + strip em-dash in test",
+      "files": [
+        "scripts/install.ps1",
+        "scripts/tests/test-install-ps1-stage-protocol.ps1"
+      ],
+      "categories": [
+        "Install/dependencies"
+      ],
+      "importance": "High",
+      "file_count": 2
+    },
+    {
+      "full": "c0b64f087750ea4a9fe11e32ad9cce21e9857e2d",
+      "short": "c0b64f087",
+      "date": "2026-05-17",
+      "subject": "fix(install.ps1): address Copilot review on #27224",
+      "files": [
+        "scripts/install.ps1"
+      ],
+      "categories": [
+        "Install/dependencies"
+      ],
+      "importance": "High",
+      "file_count": 1
+    },
+    {
+      "full": "e5f19af2a5cfed9ec7f6ea1e1f770f8a8b342de3",
+      "short": "e5f19af2a",
+      "date": "2026-05-17",
+      "subject": "feat(install.ps1): stage protocol + Windows clean-VM hardening pass",
+      "files": [
+        "scripts/install.ps1",
+        "scripts/tests/test-install-ps1-stage-protocol.ps1"
+      ],
+      "categories": [
+        "Install/dependencies"
+      ],
+      "importance": "High",
+      "file_count": 2
+    },
+    {
+      "full": "ea2ee51f0b40eac51e279e3ac746f99c2b38e4c0",
+      "short": "ea2ee51f0",
+      "date": "2026-05-17",
+      "subject": "fix(teams): fall back to default port on invalid port config",
+      "files": [
+        "plugins/platforms/teams/adapter.py",
+        "tests/gateway/test_teams.py"
+      ],
+      "categories": [
+        "Tests/reliability"
+      ],
+      "importance": "Low",
+      "file_count": 2
+    },
+    {
+      "full": "e90a52deafcca5c6b1fc06b0ef427348ec796077",
+      "short": "e90a52dea",
+      "date": "2026-05-16",
+      "subject": "chore(release): AUTHOR_MAP entries for batch salvage group 2 contributors",
+      "files": [
+        "scripts/release.py"
+      ],
+      "categories": [
+        "Internal/other"
+      ],
+      "importance": "Medium",
+      "file_count": 1
+    },
+    {
+      "full": "773a0faca0888df7b1ea310c554b70a18710813c",
+      "short": "773a0faca",
+      "date": "2026-05-16",
+      "subject": "fix(deepseek): set default_aux_model on profile so aux warning stops firing",
+      "files": [
+        "plugins/model-providers/deepseek/__init__.py",
+        "tests/plugins/model_providers/test_deepseek_profile.py"
+      ],
+      "categories": [
+        "Core agent/model routing",
+        "Tests/reliability"
+      ],
+      "importance": "High",
+      "file_count": 2
+    },
+    {
+      "full": "9a9f8a6d9945c9bf3118c557f85ad1956de4f553",
+      "short": "9a9f8a6d9",
+      "date": "2026-05-16",
+      "subject": "fix(run_agent): detect kimi models via model name for reasoning pad",
+      "files": [
+        "run_agent.py"
+      ],
+      "categories": [
+        "Core agent/model routing"
+      ],
+      "importance": "High",
+      "file_count": 1
+    },
+    {
+      "full": "5f72dd817ec2709f6fda323ef96dc55e21dd3d0d",
+      "short": "5f72dd817",
+      "date": "2026-05-17",
+      "subject": "fix(install): use resolved python variable in setup_open_webui.sh",
+      "files": [
+        "scripts/setup_open_webui.sh"
+      ],
+      "categories": [
+        "Internal/other"
+      ],
+      "importance": "Medium",
+      "file_count": 1
+    },
+    {
+      "full": "1a4e64ba06d071551ae8266ea809de0e412b45c8",
+      "short": "1a4e64ba0",
+      "date": "2026-05-16",
+      "subject": "fix(credential_pool): parse ISO-string last_status_at during from_dict rehydration (#25516)",
+      "files": [
+        "agent/credential_pool.py"
+      ],
+      "categories": [
+        "Core agent/model routing"
+      ],
+      "importance": "Medium",
+      "file_count": 1
+    },
+    {
+      "full": "508b022acb85b5b1395945e1b5f27e4706a81853",
+      "short": "508b022ac",
+      "date": "2026-05-16",
+      "subject": "feat(gateway): add .ts/.py/.sh to SUPPORTED_DOCUMENT_TYPES",
+      "files": [
+        "gateway/platforms/base.py"
+      ],
+      "categories": [
+        "Gateway/platforms"
+      ],
+      "importance": "High",
+      "file_count": 1
+    },
+    {
+      "full": "7d09bb19155275a18b3952a1f5f399d1dd87df24",
+      "short": "7d09bb191",
+      "date": "2026-05-15",
+      "subject": "fix(delegate): tool_trace false-positive error detection for short outputs",
+      "files": [
+        "tools/delegate_tool.py"
+      ],
+      "categories": [
+        "Tools/toolsets"
+      ],
+      "importance": "High",
+      "file_count": 1
+    },
+    {
+      "full": "4279da4db62a8a3cba7004c6fb1e1e53ea2c6a29",
+      "short": "4279da4db",
+      "date": "2026-05-15",
+      "subject": "fix(windows): make PowerShell installer parse in 5.1",
+      "files": [
+        "scripts/install.ps1"
+      ],
+      "categories": [
+        "Install/dependencies"
+      ],
+      "importance": "High",
+      "file_count": 1
+    },
+    {
+      "full": "7282ef1b9d4ba9b77057f53ca92cbb2ed674129b",
+      "short": "7282ef1b9",
+      "date": "2026-05-15",
+      "subject": "fix: add paste collapse logging to aid debugging",
+      "files": [
+        "cli.py"
+      ],
+      "categories": [
+        "CLI/TUI"
+      ],
+      "importance": "High",
+      "file_count": 1
+    },
+    {
+      "full": "8d756a421071d0dfd507226c03430413b6de9491",
+      "short": "8d756a421",
+      "date": "2026-05-16",
+      "subject": "fix(run_agent): guard memory provider init against empty/whitespace string",
+      "files": [
+        "run_agent.py"
+      ],
+      "categories": [
+        "Core agent/model routing"
+      ],
+      "importance": "High",
+      "file_count": 1
+    },
+    {
+      "full": "1eadb069c794ecf0626ff5c785191e604ad1f6bc",
+      "short": "1eadb069c",
+      "date": "2026-05-16",
+      "subject": "fix(kanban): --severity filter uses >= comparison per documented behavior (#26379)",
+      "files": [
+        "hermes_cli/kanban.py"
+      ],
+      "categories": [
+        "CLI/TUI",
+        "Kanban/multi-agent"
+      ],
+      "importance": "High",
+      "file_count": 1
+    },
+    {
+      "full": "782d743730e3df193c5969bc9897350fa14429cb",
+      "short": "782d74373",
+      "date": "2026-05-17",
+      "subject": "test(skills): add regression test for skill load failure returning None",
+      "files": [
+        "tests/agent/test_skill_commands.py"
+      ],
+      "categories": [
+        "Tests/reliability"
+      ],
+      "importance": "High",
+      "file_count": 1
+    },
+    {
+      "full": "4b17c2411ab2518fabe9d87872a03a47d3b8cfcc",
+      "short": "4b17c2411",
+      "date": "2026-05-17",
+      "subject": "fix(skills): return None instead of truthy stub when skill load fails",
+      "files": [
+        "agent/skill_commands.py"
+      ],
+      "categories": [
+        "Core agent/model routing"
+      ],
+      "importance": "Medium",
+      "file_count": 1
+    },
+    {
+      "full": "60531889d56a9a9d2b3f0b9ee04aea4145ede392",
+      "short": "60531889d",
+      "date": "2026-05-17",
+      "subject": "fix: remove unused import and hoist module-level constant",
+      "files": [
+        "gateway/platforms/webhook.py",
+        "tools/tts_tool.py"
+      ],
+      "categories": [
+        "Gateway/platforms",
+        "Tools/toolsets"
+      ],
+      "importance": "High",
+      "file_count": 2
+    },
+    {
+      "full": "a81cfd0a0a6de1c3028b9c800ae917d9bd7e5162",
+      "short": "a81cfd0a0",
+      "date": "2026-05-16",
+      "subject": "chore(release): map 0xchainer and kronexoi emails for upcoming salvages",
+      "files": [
+        "scripts/release.py"
+      ],
+      "categories": [
+        "Internal/other"
+      ],
+      "importance": "Medium",
+      "file_count": 1
+    },
+    {
+      "full": "57feef320178ce79070dc7ac9a399d3cf587eca4",
+      "short": "57feef320",
+      "date": "2026-05-17",
+      "subject": "test(gateway): add smoke test for logger init (regression guard for #27154)",
+      "files": [
+        "tests/hermes_cli/test_gateway.py"
+      ],
+      "categories": [
+        "Tests/reliability"
+      ],
+      "importance": "High",
+      "file_count": 1
+    },
+    {
+      "full": "4e9cedcd4c6de05a0603a3969b6991fb0836761e",
+      "short": "4e9cedcd4",
+      "date": "2026-05-17",
+      "subject": "fix(gateway): add missing logger definition to prevent NameError in _all_platforms",
+      "files": [
+        "hermes_cli/gateway.py"
+      ],
+      "categories": [
+        "CLI/TUI"
+      ],
+      "importance": "High",
+      "file_count": 1
+    },
+    {
+      "full": "32c3f06a5bf0867d11d309503122f59d0dba75d9",
+      "short": "32c3f06a5",
+      "date": "2026-05-16",
+      "subject": "docs(readme): remove hermes-eval and Hermes MemPalace from Community links (#27271)",
+      "files": [
+        "README.md"
+      ],
+      "categories": [
+        "Docs"
+      ],
+      "importance": "Low",
+      "file_count": 1
+    },
+    {
+      "full": "9f182bd7b04f73e4508999017e20740272b036a8",
+      "short": "9f182bd7b",
+      "date": "2026-05-16",
+      "subject": "Merge pull request #27251 from NousResearch/bb/skin-render-magenta-bleed",
+      "files": [],
+      "categories": [
+        "Internal/other"
+      ],
+      "importance": "Medium",
+      "file_count": 0
+    },
+    {
+      "full": "a65f723e6847f8d326947011b0d6d345d240ce25",
+      "short": "a65f723e6",
+      "date": "2026-05-16",
+      "subject": "fix(review): address Copilot follow-up on sanitizer and file decode errors",
+      "files": [
+        "hermes_cli/send_cmd.py",
+        "tests/hermes_cli/test_send_cmd.py",
+        "ui-tui/src/__tests__/text.test.ts",
+        "ui-tui/src/lib/text.ts"
+      ],
+      "categories": [
+        "CLI/TUI",
+        "Tests/reliability"
+      ],
+      "importance": "High",
+      "file_count": 4
+    },
+    {
+      "full": "7e1788db5d569f61d3aed32f74963208b03835ec",
+      "short": "7e1788db5",
+      "date": "2026-05-16",
+      "subject": "fix(tui): harden ansi sanitizers for dangling CSI",
+      "files": [
+        "ui-tui/src/__tests__/text.test.ts",
+        "ui-tui/src/lib/text.ts"
+      ],
+      "categories": [
+        "CLI/TUI"
+      ],
+      "importance": "Medium",
+      "file_count": 2
+    },
+    {
+      "full": "9b2d58159c70b46214d0ef961168bbc826651663",
+      "short": "9b2d58159",
+      "date": "2026-05-16",
+      "subject": "fix(cli): satisfy ruff encoding requirement in send_cmd",
+      "files": [
+        "hermes_cli/send_cmd.py"
+      ],
+      "categories": [
+        "CLI/TUI"
+      ],
+      "importance": "Medium",
+      "file_count": 1
+    },
+    {
+      "full": "290bf93104652bf6acaf50151f0ddac54cb69fde",
+      "short": "290bf9310",
+      "date": "2026-05-16",
+      "subject": "fix(tui): harden Terminal.app render behavior",
+      "files": [
+        "hermes_cli/main.py",
+        "tests/hermes_cli/test_tui_resume_flow.py",
+        "ui-tui/src/__tests__/forceTruecolor.test.ts",
+        "ui-tui/src/__tests__/text.test.ts",
+        "ui-tui/src/__tests__/textInputFastEcho.test.ts",
+        "ui-tui/src/components/messageLine.tsx",
+        "ui-tui/src/components/textInput.tsx",
+        "ui-tui/src/lib/forceTruecolor.ts",
+        "ui-tui/src/lib/text.ts"
+      ],
+      "categories": [
+        "CLI/TUI",
+        "Tests/reliability"
+      ],
+      "importance": "Medium",
+      "file_count": 9
+    },
+    {
+      "full": "94c3e0ab8ef253eab64c3632b0e9cc8a502f16b9",
+      "short": "94c3e0ab8",
+      "date": "2026-05-16",
+      "subject": "refactor(run_agent): extract 10 more helpers to agent/agent_runtime_helpers.py",
+      "files": [
+        "agent/agent_runtime_helpers.py",
+        "run_agent.py"
+      ],
+      "categories": [
+        "Core agent/model routing"
+      ],
+      "importance": "Medium",
+      "file_count": 2
+    },
+    {
+      "full": "973f27e95631aaecbda5e32e3fa9e5d7f6a2e1d3",
+      "short": "973f27e95",
+      "date": "2026-05-16",
+      "subject": "fix(run_agent): isolate background review fork from external memory plugins (#27190)",
+      "files": [
+        "run_agent.py",
+        "tests/run_agent/test_background_review.py"
+      ],
+      "categories": [
+        "Core agent/model routing",
+        "Tests/reliability"
+      ],
+      "importance": "Medium",
+      "file_count": 2
+    },
+    {
+      "full": "96b7f3da45931f2f0e8ce6eb880da24d2c44ac7e",
+      "short": "96b7f3da4",
+      "date": "2026-05-16",
+      "subject": "chore(release): AUTHOR_MAP entries for batch salvage contributors",
+      "files": [
+        "scripts/release.py"
+      ],
+      "categories": [
+        "Internal/other"
+      ],
+      "importance": "Medium",
+      "file_count": 1
+    },
+    {
+      "full": "7244116b687f6e5ff5e869c99cdbb1b09c822799",
+      "short": "7244116b6",
+      "date": "2026-05-14",
+      "subject": "feat(agent): Added gemma 4 to reasoning allowlist",
+      "files": [
+        "run_agent.py"
+      ],
+      "categories": [
+        "Core agent/model routing"
+      ],
+      "importance": "High",
+      "file_count": 1
+    },
+    {
+      "full": "21078ebcea6dd870835080fdc76a40284418c921",
+      "short": "21078ebce",
+      "date": "2026-05-16",
+      "subject": "fix(fallback): forward custom_providers to fallback model context-length detection",
+      "files": [
+        "run_agent.py"
+      ],
+      "categories": [
+        "Core agent/model routing"
+      ],
+      "importance": "High",
+      "file_count": 1
+    },
+    {
+      "full": "903ac23bc879cbeb9d70b1941176a91cc736b643",
+      "short": "903ac23bc",
+      "date": "2026-05-15",
+      "subject": "docs(dashboard): clarify chat tab tui flag",
+      "files": [
+        "website/docs/reference/cli-commands.md",
+        "website/docs/user-guide/features/web-dashboard.md"
+      ],
+      "categories": [
+        "Docs"
+      ],
+      "importance": "High",
+      "file_count": 2
+    },
+    {
+      "full": "c741eacd0c1d81ec8db93bfe7e4cf8296d2f3d55",
+      "short": "c741eacd0",
+      "date": "2026-05-16",
+      "subject": "docs(spotify): document Home Assistant speaker routing",
+      "files": [
+        "website/docs/user-guide/features/spotify.md"
+      ],
+      "categories": [
+        "Docs"
+      ],
+      "importance": "Low",
+      "file_count": 1
+    },
+    {
+      "full": "49bd95c43203a2264a7352acc47c35c34c8d5a65",
+      "short": "49bd95c43",
+      "date": "2026-05-16",
+      "subject": "docs(security): document YOLO mode visual indicators added in #26238",
+      "files": [
+        "website/docs/user-guide/security.md"
+      ],
+      "categories": [
+        "Docs"
+      ],
+      "importance": "High",
+      "file_count": 1
+    },
+    {
+      "full": "6f7292a555b425005fc80190f9480bad305c7ba4",
+      "short": "6f7292a55",
+      "date": "2026-05-16",
+      "subject": "docs(cron): document name-based job lookup from #26231",
+      "files": [
+        "website/docs/user-guide/features/cron.md"
+      ],
+      "categories": [
+        "Docs"
+      ],
+      "importance": "High",
+      "file_count": 1
+    },
+    {
+      "full": "86f3776a7252126d1eed6651fe1fe6668b7ed85e",
+      "short": "86f3776a7",
+      "date": "2026-05-17",
+      "subject": "docs(delegation): document api_mode wire-protocol override from #26824",
+      "files": [
+        "website/docs/user-guide/configuration.md"
+      ],
+      "categories": [
+        "Docs"
+      ],
+      "importance": "Low",
+      "file_count": 1
+    },
+    {
+      "full": "31a805883b1a39826f5faf13190d37164d3ba2ad",
+      "short": "31a805883",
+      "date": "2026-05-17",
+      "subject": "docs(delegation): show api_mode override in custom-endpoint example",
+      "files": [
+        "website/docs/user-guide/features/delegation.md"
+      ],
+      "categories": [
+        "Docs"
+      ],
+      "importance": "Low",
+      "file_count": 1
+    },
+    {
+      "full": "d5ce85c423af825bffb5333bfd433a805e29bdeb",
+      "short": "d5ce85c42",
+      "date": "2026-05-14",
+      "subject": "docs: add computer-use-linux community MCP",
+      "files": [
+        "README.md"
+      ],
+      "categories": [
+        "Docs"
+      ],
+      "importance": "High",
+      "file_count": 1
+    },
+    {
+      "full": "df80bda77831abc8beec9dfdec0b9e39565b8b68",
+      "short": "df80bda77",
+      "date": "2026-05-16",
+      "subject": "docs: add Hermes MemPalace to Community plugins section",
+      "files": [
+        "README.md"
+      ],
+      "categories": [
+        "Docs"
+      ],
+      "importance": "High",
+      "file_count": 1
+    },
+    {
+      "full": "a1e3d7969e4b448bb56073872f00e013098206a4",
+      "short": "a1e3d7969",
+      "date": "2026-05-17",
+      "subject": "docs: add hermes-eval to Community section",
+      "files": [
+        "README.md"
+      ],
+      "categories": [
+        "Docs"
+      ],
+      "importance": "High",
+      "file_count": 1
+    },
+    {
+      "full": "407a11b4190d7a6ebbc6429d0481545abd86aadc",
+      "short": "407a11b41",
+      "date": "2026-05-16",
+      "subject": "feat(discord): allow_any_attachment config to accept arbitrary file types",
+      "files": [
+        "gateway/platforms/discord.py",
+        "hermes_cli/config.py",
+        "tests/gateway/test_discord_document_handling.py",
+        "website/docs/reference/environment-variables.md",
+        "website/docs/user-guide/messaging/discord.md"
+      ],
+      "categories": [
+        "CLI/TUI",
+        "Docs",
+        "Gateway/platforms",
+        "Tests/reliability"
+      ],
+      "importance": "High",
+      "file_count": 5
+    },
+    {
+      "full": "9f408989c40c2f1ca5830bd571eb5e1701cad0ce",
+      "short": "9f408989c",
+      "date": "2026-05-16",
+      "subject": "refactor(run_agent): extract __init__ (1,381 LOC) to agent/agent_init.py",
+      "files": [
+        "agent/agent_init.py",
+        "run_agent.py"
+      ],
+      "categories": [
+        "Core agent/model routing"
+      ],
+      "importance": "Medium",
+      "file_count": 2
+    },
+    {
+      "full": "053025238434cfbf121873977b39888d7f27d1c1",
+      "short": "053025238",
+      "date": "2026-05-16",
+      "subject": "refactor(run_agent): extract run_conversation to agent/conversation_loop.py",
+      "files": [
+        "agent/conversation_loop.py",
+        "run_agent.py",
+        "tests/run_agent/test_jsondecodeerror_retryable.py",
+        "tests/run_agent/test_memory_nudge_counter_hydration.py",
+        "tests/run_agent/test_run_agent.py"
+      ],
+      "categories": [
+        "Core agent/model routing",
+        "Tests/reliability"
+      ],
+      "importance": "Medium",
+      "file_count": 5
+    },
+    {
+      "full": "d35ee7bcdd652715864d0d0c262790293a2555c6",
+      "short": "d35ee7bcd",
+      "date": "2026-05-16",
+      "subject": "refactor(run_agent): move review prompts to agent/background_review.py",
+      "files": [
+        "agent/background_review.py",
+        "run_agent.py"
+      ],
+      "categories": [
+        "Core agent/model routing"
+      ],
+      "importance": "Medium",
+      "file_count": 2
+    },
+    {
+      "full": "c42fa94afc39c7caca15cdb7b951cc338a4587f0",
+      "short": "c42fa94af",
+      "date": "2026-05-16",
+      "subject": "refactor(run_agent): extract Codex runtime + assorted helpers to dedicated modules",
+      "files": [
+        "agent/agent_runtime_helpers.py",
+        "agent/codex_runtime.py",
+        "run_agent.py"
+      ],
+      "categories": [
+        "Core agent/model routing"
+      ],
+      "importance": "Medium",
+      "file_count": 3
+    },
+    {
+      "full": "0430e71ec971d673a6d2a32fd54c1847683a16d2",
+      "short": "0430e71ec",
+      "date": "2026-05-16",
+      "subject": "refactor(run_agent): extract streaming API caller (893 LOC) to agent/chat_completion_helpers.py",
+      "files": [
+        "agent/chat_completion_helpers.py",
+        "run_agent.py",
+        "tests/run_agent/test_run_agent.py"
+      ],
+      "categories": [
+        "Core agent/model routing",
+        "Tests/reliability"
+      ],
+      "importance": "Medium",
+      "file_count": 3
+    },
+    {
+      "full": "4b25619bc4770396faf206429ddc180ad02231a9",
+      "short": "4b25619bc",
+      "date": "2026-05-16",
+      "subject": "refactor(run_agent): extract chat-completion helpers to agent/chat_completion_helpers.py",
+      "files": [
+        "agent/chat_completion_helpers.py",
+        "run_agent.py",
+        "tests/run_agent/test_run_agent.py"
+      ],
+      "categories": [
+        "Core agent/model routing",
+        "Tests/reliability"
+      ],
+      "importance": "Medium",
+      "file_count": 3
+    },
+    {
+      "full": "57f6762ca085839833b1eb9e2ca9e6cb69abcc4a",
+      "short": "57f6762ca",
+      "date": "2026-05-16",
+      "subject": "refactor(run_agent): extract stream diagnostics to agent/stream_diag.py",
+      "files": [
+        "agent/stream_diag.py",
+        "run_agent.py"
+      ],
+      "categories": [
+        "Core agent/model routing"
+      ],
+      "importance": "Medium",
+      "file_count": 2
+    },
+    {
+      "full": "79559214a650e8d6bab03337fecf307abff6a731",
+      "short": "79559214a",
+      "date": "2026-05-16",
+      "subject": "refactor(run_agent): extract tool execution to agent/tool_executor.py",
+      "files": [
+        "agent/tool_executor.py",
+        "run_agent.py",
+        "tests/run_agent/test_tool_executor_contextvar_propagation.py"
+      ],
+      "categories": [
+        "Core agent/model routing",
+        "Tests/reliability"
+      ],
+      "importance": "High",
+      "file_count": 3
+    },
+    {
+      "full": "2d2cd5e904abc11eb6c00e88e2b6d0c8b025a597",
+      "short": "2d2cd5e90",
+      "date": "2026-05-16",
+      "subject": "refactor(run_agent): extract system-prompt builder to agent/system_prompt.py",
+      "files": [
+        "agent/system_prompt.py",
+        "run_agent.py"
+      ],
+      "categories": [
+        "Core agent/model routing"
+      ],
+      "importance": "Medium",
+      "file_count": 2
+    },
+    {
+      "full": "5311d9959e19477aac8aa7deca46c1ee0b8e7000",
+      "short": "5311d9959",
+      "date": "2026-05-16",
+      "subject": "refactor(run_agent): extract context compression to agent/conversation_compression.py",
+      "files": [
+        "agent/conversation_compression.py",
+        "run_agent.py"
+      ],
+      "categories": [
+        "Core agent/model routing"
+      ],
+      "importance": "Medium",
+      "file_count": 2
+    },
+    {
+      "full": "1f6eb1738c206e95c3e0641c3d8000a4d0be841b",
+      "short": "1f6eb1738",
+      "date": "2026-05-16",
+      "subject": "refactor(run_agent): extract background memory/skill review to agent/background_review.py",
+      "files": [
+        "agent/background_review.py",
+        "run_agent.py"
+      ],
+      "categories": [
+        "Core agent/model routing"
+      ],
+      "importance": "Medium",
+      "file_count": 2
+    },
+    {
+      "full": "5f309ae685d08a2d23eaa992a5bca1f70f52486a",
+      "short": "5f309ae68",
+      "date": "2026-05-16",
+      "subject": "refactor(run_agent): extract OpenAI proxy, safe stdio, IterationBudget",
+      "files": [
+        "agent/iteration_budget.py",
+        "agent/process_bootstrap.py",
+        "run_agent.py"
+      ],
+      "categories": [
+        "Core agent/model routing"
+      ],
+      "importance": "High",
+      "file_count": 3
+    },
+    {
+      "full": "59f1c0f0b668db8311b8ea15bdfc2d1fe373227d",
+      "short": "59f1c0f0b",
+      "date": "2026-05-16",
+      "subject": "refactor(run_agent): extract tool-dispatch helpers to agent/tool_dispatch_helpers.py",
+      "files": [
+        "agent/tool_dispatch_helpers.py",
+        "run_agent.py"
+      ],
+      "categories": [
+        "Core agent/model routing"
+      ],
+      "importance": "High",
+      "file_count": 2
+    },
+    {
+      "full": "885d1242a265e1a373311dbc1899c569dac56646",
+      "short": "885d1242a",
+      "date": "2026-05-16",
+      "subject": "refactor(run_agent): extract message sanitization to agent/message_sanitization.py",
+      "files": [
+        "agent/message_sanitization.py",
+        "run_agent.py"
+      ],
+      "categories": [
+        "Core agent/model routing"
+      ],
+      "importance": "Medium",
+      "file_count": 2
+    },
+    {
+      "full": "3b39096904ae63a9e784b2403ad6ad27160bb2ef",
+      "short": "3b3909690",
+      "date": "2026-05-16",
+      "subject": "Port from Kilo-Org/kilocode#9434: strip historical media after compression (#27189)",
+      "files": [
+        "agent/context_compressor.py",
+        "tests/agent/test_compressor_historical_media.py"
+      ],
+      "categories": [
+        "Core agent/model routing",
+        "Tests/reliability"
+      ],
+      "importance": "Medium",
+      "file_count": 2
+    },
+    {
+      "full": "5cbe0b1c4ffabf6aeca31827ba9a76ec35e4d4fb",
+      "short": "5cbe0b1c4",
+      "date": "2026-05-16",
+      "subject": "test(plugins): cover _discover_all_plugins recursion + cross-link loader",
+      "files": [
+        "hermes_cli/plugins_cmd.py",
+        "tests/hermes_cli/test_plugins_cmd.py"
+      ],
+      "categories": [
+        "CLI/TUI",
+        "Tests/reliability"
+      ],
+      "importance": "Medium",
+      "file_count": 2
+    },
+    {
+      "full": "21be7025c584ea9b1d829e088b6049e259c6859a",
+      "short": "21be7025c",
+      "date": "2026-05-16",
+      "subject": "refactor(plugins): drop dead bundled-source guard in _discover_all_plugins",
+      "files": [
+        "hermes_cli/plugins_cmd.py"
+      ],
+      "categories": [
+        "CLI/TUI"
+      ],
+      "importance": "Medium",
+      "file_count": 1
+    },
+    {
+      "full": "8ab8bc2f035ac4ed8b3b43ed2940ba3dc4589cc9",
+      "short": "8ab8bc2f0",
+      "date": "2026-05-16",
+      "subject": "fix(plugins): remove unreachable hermes tools → Langfuse path",
+      "files": [
+        "hermes_cli/config.py",
+        "hermes_cli/tools_config.py",
+        "plugins/observability/langfuse/README.md",
+        "plugins/observability/langfuse/__init__.py",
+        "plugins/observability/langfuse/plugin.yaml",
+        "website/docs/reference/environment-variables.md",
+        "website/docs/user-guide/features/built-in-plugins.md"
+      ],
+      "categories": [
+        "CLI/TUI",
+        "Docs"
+      ],
+      "importance": "High",
+      "file_count": 7
+    },
+    {
+      "full": "9b82586c6b6dd628af273b3c6875e0142f798089",
+      "short": "9b82586c6",
+      "date": "2026-05-16",
+      "subject": "fix(plugins): surface category-namespaced plugins in hermes plugins list",
+      "files": [
+        "hermes_cli/plugins_cmd.py",
+        "website/docs/user-guide/features/plugins.md"
+      ],
+      "categories": [
+        "CLI/TUI",
+        "Docs"
+      ],
+      "importance": "Medium",
+      "file_count": 2
+    },
+    {
+      "full": "29b1bd0e20e5848e2be8de431a225174ab6a7fed",
+      "short": "29b1bd0e2",
+      "date": "2026-05-16",
+      "subject": "feat(cli): add `hermes send` to pipe script output to any messaging platform (#27188)",
+      "files": [
+        "hermes_cli/main.py",
+        "hermes_cli/send_cmd.py",
+        "tests/hermes_cli/test_send_cmd.py",
+        "website/docs/developer-guide/gateway-internals.md",
+        "website/docs/guides/automate-with-cron.md",
+        "website/docs/guides/pipe-script-output.md"
+      ],
+      "categories": [
+        "CLI/TUI",
+        "Docs",
+        "Tests/reliability"
+      ],
+      "importance": "High",
+      "file_count": 6
+    },
+    {
+      "full": "33528b428d196443f788f43fec3139bd6e2c4997",
+      "short": "33528b428",
+      "date": "2026-05-06",
+      "subject": "fix(agent): reset _fallback_index at turn start even when no fallback activated",
+      "files": [
+        "run_agent.py",
+        "tests/run_agent/test_primary_runtime_restore.py"
+      ],
+      "categories": [
+        "Core agent/model routing",
+        "Tests/reliability"
+      ],
+      "importance": "Medium",
+      "file_count": 2
+    },
+    {
+      "full": "2b193907d668af0c45f108d885db53a7ce8b8919",
+      "short": "2b193907d",
+      "date": "2026-05-16",
+      "subject": "fix(xai): surface provider 'error' SSE frame in Codex fallback stream (#27184)",
+      "files": [
+        "run_agent.py",
+        "tests/run_agent/test_streaming.py"
+      ],
+      "categories": [
+        "Core agent/model routing",
+        "Tests/reliability"
+      ],
+      "importance": "High",
+      "file_count": 2
+    },
+    {
+      "full": "e21cb8d1457f603cda1dc8413efc400721d256e7",
+      "short": "e21cb8d14",
+      "date": "2026-05-16",
+      "subject": "feat(status): append session recap to /status output (#27176)",
+      "files": [
+        "cli.py",
+        "gateway/run.py",
+        "hermes_cli/session_recap.py",
+        "tests/hermes_cli/test_session_recap.py"
+      ],
+      "categories": [
+        "CLI/TUI",
+        "Gateway/platforms",
+        "Tests/reliability"
+      ],
+      "importance": "High",
+      "file_count": 4
+    },
+    {
+      "full": "226cee43d97997525e4e26a20075aec98e641418",
+      "short": "226cee43d",
+      "date": "2026-05-16",
+      "subject": "feat(cli): show ▶ N indicator in status bar when /background tasks are running (#27175)",
+      "files": [
+        "cli.py",
+        "tests/cli/test_cli_background_status_indicator.py"
+      ],
+      "categories": [
+        "CLI/TUI",
+        "Tests/reliability"
+      ],
+      "importance": "High",
+      "file_count": 2
+    },
+    {
+      "full": "6f817e1447499cf51d8c966b3f3a600ba3412f85",
+      "short": "6f817e144",
+      "date": "2026-05-16",
+      "subject": "fix(telegram): restore DM topic typing indicator",
+      "files": [
+        "gateway/platforms/telegram.py",
+        "tests/gateway/test_telegram_thread_fallback.py"
+      ],
+      "categories": [
+        "Gateway/platforms",
+        "Tests/reliability"
+      ],
+      "importance": "High",
+      "file_count": 2
+    },
+    {
+      "full": "e51d74ab917675a67e6a964d6c2c2ea2b150ac2c",
+      "short": "e51d74ab9",
+      "date": "2026-05-15",
+      "subject": "fix(codex): rotate pool on usage limit 429",
+      "files": [
+        "run_agent.py",
+        "tests/run_agent/test_run_agent.py"
+      ],
+      "categories": [
+        "Core agent/model routing",
+        "Tests/reliability"
+      ],
+      "importance": "Medium",
+      "file_count": 2
+    },
+    {
+      "full": "dffb602f37b3c1b9c9fd7f0417aab3af56cffa38",
+      "short": "dffb602f3",
+      "date": "2026-05-16",
+      "subject": "fix(xai): drop stale X Premium+ hint from entitlement 403 surfacing (#27110)",
+      "files": [
+        "run_agent.py",
+        "tests/run_agent/test_codex_xai_oauth_recovery.py"
+      ],
+      "categories": [
+        "Core agent/model routing",
+        "Tests/reliability"
+      ],
+      "importance": "Medium",
+      "file_count": 2
+    },
+    {
+      "full": "fb05f5d4b58d4fb20c3a4a98c2c150de3f729f3c",
+      "short": "fb05f5d4b",
+      "date": "2026-05-16",
+      "subject": "fix(mcp): validate remote URLs up-front with a clear error (#27105)",
+      "files": [
+        "tests/tools/test_mcp_invalid_url.py",
+        "tools/mcp_tool.py"
+      ],
+      "categories": [
+        "Tests/reliability",
+        "Tools/toolsets"
+      ],
+      "importance": "Medium",
+      "file_count": 2
+    },
+    {
+      "full": "93e109a1d552b03c847b96077428048cceb012cd",
+      "short": "93e109a1d",
+      "date": "2026-05-16",
+      "subject": "fix(moonshot): strip $ref siblings and collapse tuple items in tool schemas (#27104)",
+      "files": [
+        "agent/moonshot_schema.py",
+        "tests/agent/test_moonshot_schema.py"
+      ],
+      "categories": [
+        "Core agent/model routing",
+        "Tests/reliability"
+      ],
+      "importance": "High",
+      "file_count": 2
+    },
+    {
+      "full": "dc3d0fe1489aebd5747fa620d9b2eec751a92a55",
+      "short": "dc3d0fe14",
+      "date": "2026-05-16",
+      "subject": "Port from cline/cline#10343: periodic gateway memory logging (#27102)",
+      "files": [
+        "gateway/memory_monitor.py",
+        "gateway/run.py",
+        "hermes_cli/config.py",
+        "tests/gateway/test_memory_monitor.py"
+      ],
+      "categories": [
+        "CLI/TUI",
+        "Gateway/platforms",
+        "Tests/reliability"
+      ],
+      "importance": "High",
+      "file_count": 4
+    },
+    {
+      "full": "fc03c95da13105807cb3b3f42a311e4916b456ce",
+      "short": "fc03c95da",
+      "date": "2026-05-16",
+      "subject": "feat(cli): add /exit --delete flag to remove session on quit (#27101)",
+      "files": [
+        "cli.py",
+        "hermes_cli/commands.py",
+        "tests/cli/test_exit_delete_session.py",
+        "website/docs/reference/slash-commands.md"
+      ],
+      "categories": [
+        "CLI/TUI",
+        "Docs",
+        "Tests/reliability"
+      ],
+      "importance": "High",
+      "file_count": 4
+    },
+    {
+      "full": "c844d15c3d27991a35bbc4ec56558d85122412c9",
+      "short": "c844d15c3",
+      "date": "2026-05-02",
+      "subject": "fix(update): stream npm install output so postinstall progress is visible (#18840)",
+      "files": [
+        "hermes_cli/main.py",
+        "tests/hermes_cli/test_cmd_update.py"
+      ],
+      "categories": [
+        "CLI/TUI",
+        "Tests/reliability"
+      ],
+      "importance": "High",
+      "file_count": 2
+    },
+    {
+      "full": "05af78c53d553f6dd20012ce18eb0c2c02d346c9",
+      "short": "05af78c53",
+      "date": "2026-05-16",
+      "subject": "fix(update): make Camofox lazy-installed instead of eager (#27055)",
+      "files": [
+        "hermes_cli/tools_config.py",
+        "package-lock.json",
+        "package.json",
+        "tests/test_package_json_lazy_deps.py"
+      ],
+      "categories": [
+        "CLI/TUI",
+        "Install/dependencies",
+        "Tests/reliability"
+      ],
+      "importance": "High",
+      "file_count": 4
+    },
+    {
+      "full": "8a2b2b9f6f9c419fdef48f542bf4b1991c655810",
+      "short": "8a2b2b9f6",
+      "date": "2026-05-16",
+      "subject": "docs(release): expand v0.14.0 highlights with newcomer-friendly context (#27053)",
+      "files": [
+        "RELEASE_v0.14.0.md"
+      ],
+      "categories": [
+        "Docs"
+      ],
+      "importance": "Low",
+      "file_count": 1
+    },
+    {
+      "full": "6c2406c5e131dbbcabb69319c73c02594f63caea",
+      "short": "6c2406c5e",
+      "date": "2026-05-16",
+      "subject": "fix(signal): read groupV2.id in envelope, fall back to legacy groupInfo (#27051)",
+      "files": [
+        "gateway/platforms/signal.py",
+        "tests/gateway/test_signal.py"
+      ],
+      "categories": [
+        "Gateway/platforms",
+        "Tests/reliability"
+      ],
+      "importance": "High",
+      "file_count": 2
+    },
+    {
+      "full": "35f25523c60d9b1174c9a5d901e34f2300d81986",
+      "short": "35f25523c",
+      "date": "2026-05-16",
+      "subject": "docs(tools): add video_generate / video_gen toolset to user-facing tool docs (#27050)",
+      "files": [
+        "website/docs/reference/tools-reference.md",
+        "website/docs/user-guide/features/tools.md"
+      ],
+      "categories": [
+        "Docs"
+      ],
+      "importance": "High",
+      "file_count": 2
+    },
+    {
+      "full": "683698742852ce0455f3a07b12c772c786d5a2ae",
+      "short": "683698742",
+      "date": "2026-05-16",
+      "subject": "docs(release): rewrite v0.14.0 highlights for excitement framing (#27035)",
+      "files": [
+        "RELEASE_v0.14.0.md"
+      ],
+      "categories": [
+        "Docs"
+      ],
+      "importance": "Low",
+      "file_count": 1
+    },
+    {
+      "full": "3034eee38ec516109566c00975be4d0276747c34",
+      "short": "3034eee38",
+      "date": "2026-05-16",
+      "subject": "fix(acp): replay session history before responding to session/load (#12285 follow-up) (#26957)",
+      "files": [
+        "acp_adapter/server.py",
+        "tests/acp/test_server.py"
+      ],
+      "categories": [
+        "Tests/reliability"
+      ],
+      "importance": "Low",
+      "file_count": 2
+    },
+    {
+      "full": "f3a4af9cf2a626cb3e055766cb1cff60168d295d",
+      "short": "f3a4af9cf",
+      "date": "2026-05-16",
+      "subject": "fix(acp): replay assistant reasoning as agent_thought_chunk on session/load (#12285) (#26943)",
+      "files": [
+        "acp_adapter/server.py",
+        "tests/acp/test_server.py"
+      ],
+      "categories": [
+        "Tests/reliability"
+      ],
+      "importance": "Low",
+      "file_count": 2
+    }
+  ]
+}
