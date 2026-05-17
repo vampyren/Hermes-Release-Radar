@@ -6,6 +6,3 @@ state.json
 runs/
 /index.html
 /history.html
-!public/
-!public/index.html
-!public/snapshot.json

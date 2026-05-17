@@ -19,12 +19,15 @@ import os
 import subprocess
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent
-REPO = Path.home() / ".hermes" / "hermes-agent"
+ROOT = Path(os.environ.get("RELEASE_RADAR_ROOT", Path(__file__).resolve().parent)).expanduser()
+REPO = Path(os.environ.get("RELEASE_RADAR_HERMES_REPO", Path.home() / ".hermes" / "hermes-agent")).expanduser()
 GENERATE = ROOT / "generate.py"
 STATE_PATH = ROOT / "state.json"
-HOST = "127.0.0.1"
-PORT = 8765
+HOST = os.environ.get("RELEASE_RADAR_HOST", "127.0.0.1")
+try:
+    PORT = int(os.environ.get("RELEASE_RADAR_PORT", "8765"))
+except ValueError as exc:
+    raise RuntimeError("RELEASE_RADAR_PORT must be an integer") from exc
 
 
 def load_state() -> dict:
@@ -41,6 +44,10 @@ def save_state(state: dict) -> None:
 
 def regenerate(refresh: bool = False) -> str:
     env = os.environ.copy()
+    env["RELEASE_RADAR_ROOT"] = str(ROOT)
+    env["RELEASE_RADAR_HERMES_REPO"] = str(REPO)
+    env["RELEASE_RADAR_HOST"] = HOST
+    env["RELEASE_RADAR_PORT"] = str(PORT)
     if refresh:
         env["RELEASE_RADAR_REFRESH"] = "1"
     out = subprocess.run(

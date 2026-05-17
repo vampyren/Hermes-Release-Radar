@@ -4,23 +4,25 @@ Hermes Release Radar is a local, safe update-intelligence page for Hermes Agent.
 
 It answers: what changed upstream since the Hermes checkout I am running now, and what actually matters?
 
-Current project version: `0.3.1-public`.
+Published project version: `0.3.1-public`; main branch may include unreleased local-only cleanup changes.
 
-## Current local URL
+## Local URL
 
 ```text
 http://127.0.0.1:8765/
 ```
 
-## Public demo vs local mode
+## Product direction
 
-The GitHub Pages/public demo is a separate static build under `public/`. It uses only public Hermes Agent repository data and is safe to publish.
+Release Radar is a local product, not a hosted demo.
 
-The public demo does not know what you have installed, does not persist review markers, does not call the local helper API, and does not provide personalized update advice. Run Release Radar locally for installed-vs-upstream comparison, marker persistence, local modified-file checks, and update decisions.
+A user downloads this repo, runs the helper locally, and Release Radar checks that user's own Hermes checkout. First run initializes that user's own `state.json` from their own checkout, then future refreshes preserve their review markers and installed-update history.
+
+GitHub presentation is handled by README/docs/screenshots. The previous separate public demo generator and GitHub Pages rebuild path were intentionally removed to keep one generator and avoid drift.
 
 ## What it does
 
-- Inspects the local Hermes Agent checkout at `~/.hermes/hermes-agent`.
+- Inspects the local Hermes Agent checkout at `~/.hermes/hermes-agent` by default.
 - Compares local `HEAD` with `origin/main`.
 - Generates a calm browser page with:
   - Official release notes, only when a newer release tag is actually ahead.
@@ -28,7 +30,20 @@ The public demo does not know what you have installed, does not persist review m
   - Raw categorized commits for auditability.
   - Durable review markers stored in `state.json`.
   - Installed-update history once Hermes actually advances.
-- Runs as a local-only helper service on `127.0.0.1:8765`.
+- Runs as a local-only helper service on `127.0.0.1:8765` by default.
+
+## Configuration
+
+The defaults work for a normal Hermes install:
+
+```text
+RELEASE_RADAR_HERMES_REPO=~/.hermes/hermes-agent
+RELEASE_RADAR_ROOT=~/.hermes/release-radar
+RELEASE_RADAR_HOST=127.0.0.1
+RELEASE_RADAR_PORT=8765
+```
+
+Set these environment variables only if your Hermes checkout, runtime folder, host, or port differs. The defaults are generic per-user paths, not project-private state.
 
 ## Screenshots
 
@@ -107,15 +122,11 @@ curl -s -X POST http://127.0.0.1:8765/api/refresh
 ## Repository layout
 
 ```text
-.github/workflows/public-pages.yml       Scheduled/manual public demo rebuild
-src/generate.py                          Local private page generator
-src/generate_public.py                   Public GitHub Pages/demo generator
+src/generate.py                          Local page generator
 src/serve.py                             Local-only helper server
 systemd/hermes-release-radar.service     User systemd service
-public/index.html                        Generated public demo page
-public/snapshot.json                     Generated public demo data snapshot
 docs/help.html                           Rendered help page
-docs/RELEASE_LOG.md                      Public project changelog
+docs/RELEASE_LOG.md                      Project changelog
 scripts/render_help.py                   Markdown-to-help HTML renderer
 HELP.md                                  Operator help
 README.md                                Project overview

@@ -2,36 +2,43 @@
 
 ## Components
 
-- `src/generate.py`: reads Hermes git/release data and writes generated pages.
-- `src/serve.py`: local-only HTTP helper on `127.0.0.1:8765`.
-- `state.json`: durable local state in `~/.hermes/release-radar/`.
+- `src/generate.py`: reads a user's local Hermes git/release data and writes generated pages.
+- `src/serve.py`: local-only HTTP helper on `127.0.0.1:8765` by default.
+- `state.json`: durable local state in `~/.hermes/release-radar/` by default.
 - `index.html`: current pending-update radar page.
 - `history.html`: installed-update history page.
 - `help.html`: operator help page.
 - `systemd/hermes-release-radar.service`: user service unit.
 
-## Public GitHub Pages mode
+## Configuration
 
-GitHub Pages is a separate public/demo build path, not the local Rex workflow.
+The defaults are generic per-user local paths:
 
-Implemented shape:
+```text
+RELEASE_RADAR_HERMES_REPO=~/.hermes/hermes-agent
+RELEASE_RADAR_ROOT=~/.hermes/release-radar
+RELEASE_RADAR_HOST=127.0.0.1
+RELEASE_RADAR_PORT=8765
+```
 
-- Public output lives under `public/`.
-- `src/generate_public.py` reads only a public Hermes Agent git checkout plus public GitHub release metadata.
-- `.github/workflows/public-pages.yml` runs on a schedule and manual dispatch, regenerates `public/index.html` and `public/snapshot.json`, privacy-scans them, commits only those public artifacts when they change, and deploys the `public/` artifact to GitHub Pages.
-- The public page excludes helper API controls, local service status, local filesystem paths, Rex's `state.json`, review markers, and installed-checkout-specific claims.
-- The public page warns clearly: it is a public static demo. To compare your own installed Hermes checkout and track your own review markers, run Release Radar locally.
-- Local mode remains the canonical personal workflow and stays bound to `127.0.0.1`.
+A normal install does not need to set these. They exist so users with a non-default Hermes checkout, runtime folder, host, or port do not need to edit source code.
+
+## GitHub presentation
+
+The product is local-first. GitHub presentation is README/docs/screenshots only.
+
+A separate public GitHub Pages generator and rebuild workflow were intentionally removed. Keeping one generator avoids drift and keeps the product focused on the user's own installed-vs-upstream comparison, local review markers, and local update decisions.
 
 ## Data flow
 
-1. Browser opens `http://127.0.0.1:8765/`.
-2. `serve.py` serves static files and API endpoints.
+1. Browser opens `http://127.0.0.1:8765/` by default.
+2. `serve.py` serves static files and API endpoints from `RELEASE_RADAR_ROOT`.
 3. Page calls `/api/status` on load.
 4. Refresh button calls `/api/refresh`.
-5. `/api/refresh` runs `git fetch origin --quiet` in `~/.hermes/hermes-agent` and then regenerates the page.
+5. `/api/refresh` runs `git fetch origin --quiet` in `RELEASE_RADAR_HERMES_REPO` and then regenerates the page.
 6. Marker buttons call `/api/markers`.
 7. `/api/markers` writes `review_markers` into `state.json` and regenerates the page.
+8. On first run, `src/generate.py` initializes `state.json` from the current `HEAD` of the user's configured Hermes checkout.
 
 ## API
 
@@ -52,13 +59,14 @@ Implemented shape:
 
 ## Safety boundaries
 
-Allowed writes are limited to the Release Radar runtime folder.
+Allowed writes are limited to the configured Release Radar runtime folder.
 
-Public Pages safety boundaries:
+Local-only safety boundaries:
 
-- Never publish Rex's private runtime folder, local paths, service state, markers, or local checkout details.
-- GitHub Actions may write generated public artifacts and commit them back to the repository when the workflow is explicitly added for public mode.
-- The public site must not imply it can update Hermes. Updates happen only in a user's local environment after they run their own install/update process.
+- Do not turn Release Radar into an updater.
+- Do not bind outside localhost by default.
+- Do not publish a user's private runtime folder, local paths, service state, markers, or local checkout details.
+- Do not maintain a separate public demo generator or generated public artifacts; README/docs/screenshots are enough for GitHub presentation.
 
 Forbidden without separate explicit approval:
 

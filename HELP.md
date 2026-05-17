@@ -7,9 +7,9 @@ Short operational help for installing and running Hermes Release Radar as a loca
 Hermes Release Radar shows what changed upstream in Hermes Agent without updating Hermes.
 
 It is intentionally safe:
-- It reads `~/.hermes/hermes-agent`.
+- It reads `~/.hermes/hermes-agent` by default.
 - It may run `git fetch origin --quiet` when you press refresh.
-- It regenerates local HTML output in `~/.hermes/release-radar/`.
+- It regenerates local HTML output in `~/.hermes/release-radar/` by default.
 - It saves review markers in `~/.hermes/release-radar/state.json`.
 - It does not run `hermes update`.
 - It does not install packages.
@@ -28,6 +28,19 @@ http://127.0.0.1:8765/
 - Git available.
 - Existing Hermes Agent checkout at `~/.hermes/hermes-agent`.
 - Do not expose port `8765` outside localhost without authentication.
+
+## Configuration
+
+The defaults work for a normal Hermes install:
+
+```text
+RELEASE_RADAR_HERMES_REPO=~/.hermes/hermes-agent
+RELEASE_RADAR_ROOT=~/.hermes/release-radar
+RELEASE_RADAR_HOST=127.0.0.1
+RELEASE_RADAR_PORT=8765
+```
+
+Set these environment variables only if your Hermes checkout, runtime folder, host, or port differs.
 
 ## Short installation
 
@@ -94,6 +107,11 @@ ExecStart=/usr/bin/python3 %h/.hermes/release-radar/serve.py
 Restart=on-failure
 RestartSec=5
 Environment=PYTHONUNBUFFERED=1
+# Optional overrides:
+# Environment=RELEASE_RADAR_HERMES_REPO=%h/.hermes/hermes-agent
+# Environment=RELEASE_RADAR_ROOT=%h/.hermes/release-radar
+# Environment=RELEASE_RADAR_HOST=127.0.0.1
+# Environment=RELEASE_RADAR_PORT=8765
 
 [Install]
 WantedBy=default.target

@@ -2,7 +2,10 @@
 
 ## Unreleased
 
-- Nothing yet.
+- Removed the separate public GitHub Pages demo path to keep one generator and avoid drift.
+- Deleted the public demo generator, generated public artifacts, and public rebuild workflow.
+- Added environment-variable configuration for Hermes checkout, Release Radar runtime root, host, and port while preserving local defaults.
+- Re-centered README and architecture docs around the local helper/generator product flow.
 
 ## 0.3.1-public - 2026-05-17
 

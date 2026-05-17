@@ -65,9 +65,9 @@ pre code {
 <p>Hermes Release Radar shows what changed upstream in Hermes Agent without updating Hermes.</p>
 <p>It is intentionally safe:</p>
 <ul>
-<li>It reads <code>~/.hermes/hermes-agent</code>.</li>
+<li>It reads <code>~/.hermes/hermes-agent</code> by default.</li>
 <li>It may run <code>git fetch origin --quiet</code> when you press refresh.</li>
-<li>It regenerates local HTML output in <code>~/.hermes/release-radar/</code>.</li>
+<li>It regenerates local HTML output in <code>~/.hermes/release-radar/</code> by default.</li>
 <li>It saves review markers in <code>~/.hermes/release-radar/state.json</code>.</li>
 <li>It does not run <code>hermes update</code>.</li>
 <li>It does not install packages.</li>
@@ -83,6 +83,13 @@ pre code {
 <li>Existing Hermes Agent checkout at <code>~/.hermes/hermes-agent</code>.</li>
 <li>Do not expose port <code>8765</code> outside localhost without authentication.</li>
 </ul>
+<h2>Configuration</h2>
+<p>The defaults work for a normal Hermes install:</p>
+<div class="cmd-card"><div class="cmd-top"><span>Command</span><button type="button" onclick="copyCode(this)">Copy</button></div><pre><code>RELEASE_RADAR_HERMES_REPO=~/.hermes/hermes-agent
+RELEASE_RADAR_ROOT=~/.hermes/release-radar
+RELEASE_RADAR_HOST=127.0.0.1
+RELEASE_RADAR_PORT=8765</code></pre></div>
+<p>Set these environment variables only if your Hermes checkout, runtime folder, host, or port differs.</p>
 <h2>Short installation</h2>
 <p>Clone the project:</p>
 <div class="cmd-card"><div class="cmd-top"><span>Command</span><button type="button" onclick="copyCode(this)">Copy</button></div><pre><code>git clone https://github.com/vampyren/Hermes-Release-Radar.git ~/Apps/Hermes-Release-Radar</code></pre></div>
@@ -120,6 +127,11 @@ ExecStart=/usr/bin/python3 %h/.hermes/release-radar/serve.py
 Restart=on-failure
 RestartSec=5
 Environment=PYTHONUNBUFFERED=1
+# Optional overrides:
+# Environment=RELEASE_RADAR_HERMES_REPO=%h/.hermes/hermes-agent
+# Environment=RELEASE_RADAR_ROOT=%h/.hermes/release-radar
+# Environment=RELEASE_RADAR_HOST=127.0.0.1
+# Environment=RELEASE_RADAR_PORT=8765
 
 [Install]
 WantedBy=default.target</code></pre></div>

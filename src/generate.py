@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate Rex's local Hermes Release Radar pages.
+"""Generate local Hermes Release Radar pages.
 Safe by design: read-only git inspection plus optional GitHub release-note reads.
 It never runs hermes update, installs packages, restarts services, resets, stashes,
 or modifies the Hermes source checkout.
@@ -18,8 +18,27 @@ from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Any
 
-ROOT = Path.home() / ".hermes" / "release-radar"
-REPO = Path.home() / ".hermes" / "hermes-agent"
+def env_path(name: str, default: Path) -> Path:
+    value = os.environ.get(name)
+    if not value:
+        return default
+    return Path(value).expanduser()
+
+
+def env_int(name: str, default: int) -> int:
+    value = os.environ.get(name)
+    if not value:
+        return default
+    try:
+        return int(value)
+    except ValueError as exc:
+        raise RuntimeError(f"{name} must be an integer, got {value!r}") from exc
+
+
+ROOT = env_path("RELEASE_RADAR_ROOT", Path.home() / ".hermes" / "release-radar")
+REPO = env_path("RELEASE_RADAR_HERMES_REPO", Path.home() / ".hermes" / "hermes-agent")
+HELPER_HOST = os.environ.get("RELEASE_RADAR_HOST", "127.0.0.1")
+HELPER_PORT = env_int("RELEASE_RADAR_PORT", 8765)
 STATE_PATH = ROOT / "state.json"
 HTML_PATH = ROOT / "index.html"
 HISTORY_PATH = ROOT / "history.html"
@@ -359,7 +378,7 @@ def build_new_since_refresh(state: dict[str, Any], data: dict[str, Any]) -> dict
         return empty
     if previous == current:
         # A refresh with zero new upstream commits should not wipe the last
-        # visible highlights. Rex uses those as "what changed recently" cues
+        # visible highlights. Users can treat those as "what changed recently" cues
         # until a later refresh actually discovers new commits, at which point
         # the highlight set is replaced below.
         if state.get("last_refresh_highlights"):
@@ -476,7 +495,7 @@ def render_release_notes(data: dict[str, Any]) -> str:
         banner += f'<p class="muted compact-note">{new_card_count} impact card(s) have fresh commits.</p>'
     return (
         '<section class="card release-notes">'
-        '<div class="row"><h2>What actually matters</h2><span class="pill high">Rex-focused</span></div>'
+        '<div class="row"><h2>What actually matters</h2><span class="pill high">Local review</span></div>'
         f'{banner}'
         f'<p class="recommendation">{html.escape(rel["recommendation"])}</p>'
         '<p class="muted">All impact cards are shown here. This combines official release notes with local commit/file heuristics; raw commits stay in the Raw categorized commits tab for auditability.</p>'
@@ -558,6 +577,7 @@ def render_page(data: dict[str, Any], state: dict[str, Any]) -> str:
     latest = data.get("latest_release", {})
     history_count = len(state.get("history", []))
     page_state = {"review_markers": state.get("review_markers", []), "upstream": data.get("upstream", "") }
+    helper_url = f"http://{HELPER_HOST}:{HELPER_PORT}"
     return f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Hermes Release Radar</title>
@@ -577,7 +597,7 @@ def render_page(data: dict[str, Any], state: dict[str, Any]) -> str:
 <div class="summary-item"><div class="summary-label">High impact</div><div class="summary-value">{data['importance_counts'].get('High',0)}</div></div>
 <div class="summary-item"><div class="summary-label">Upstream</div><div class="summary-value"><code>{data['upstream'][:10]}</code></div></div>
 </section>
-<section class="helperbar"><div><b>Local helper service</b><p id="helperDetail" class="muted">Checking local-only service on <code>127.0.0.1:8765</code>.</p></div><div class="helper-actions"><button class="refresh" onclick="refreshRadar()">Refresh from upstream</button><button onclick="checkHelperStatus()">Check status</button><a class="openlink" href="http://127.0.0.1:8765/">Open service</a></div></section>
+<section class="helperbar"><div><b>Local helper service</b><p id="helperDetail" class="muted">Checking local-only service on <code>{html.escape(helper_url)}</code>.</p></div><div class="helper-actions"><button class="refresh" onclick="refreshRadar()">Refresh from upstream</button><button onclick="checkHelperStatus()">Check status</button><a class="openlink" href="{html.escape(helper_url)}/">Open service</a></div></section>
 <nav class="tabs" aria-label="Release radar sections"><button class="tabbtn active" onclick="switchTab('official', this)">Official release notes</button><button class="tabbtn" onclick="switchTab('matters', this)">What actually matters</button><button class="tabbtn" onclick="switchTab('raw', this)">Raw categorized commits</button></nav>
 <section id="tab-official" class="tab-panel active">{official}</section>
 <section id="tab-matters" class="tab-panel">{release_notes}</section>
@@ -593,7 +613,7 @@ def render_page(data: dict[str, Any], state: dict[str, Any]) -> str:
 <script>
 const DATA = {{}};
 const STATE = {js_data(page_state)};
-const HELPER = 'http://127.0.0.1:8765';
+const HELPER = {js_data(helper_url)};
 const TODAY_LABEL = '{today_sv}';
 let helperOnline = false;
 let MARKERS = Array.isArray(STATE.review_markers) ? [...STATE.review_markers] : [];

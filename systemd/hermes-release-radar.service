@@ -10,6 +10,11 @@ ExecStart=/usr/bin/python3 %h/.hermes/release-radar/serve.py
 Restart=on-failure
 RestartSec=5
 Environment=PYTHONUNBUFFERED=1
+# Optional overrides:
+# Environment=RELEASE_RADAR_HERMES_REPO=%h/.hermes/hermes-agent
+# Environment=RELEASE_RADAR_ROOT=%h/.hermes/release-radar
+# Environment=RELEASE_RADAR_HOST=127.0.0.1
+# Environment=RELEASE_RADAR_PORT=8765
 
 [Install]
 WantedBy=default.target

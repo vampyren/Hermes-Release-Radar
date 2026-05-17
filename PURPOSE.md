@@ -1,6 +1,6 @@
 # Purpose
 
-Hermes Release Radar exists to make Hermes Agent updates understandable before Rex decides whether to update.
+Hermes Release Radar exists to make Hermes Agent updates understandable before a user decides whether to update.
 
 The project is not an updater. It is an intelligence and review layer.
 
@@ -8,7 +8,7 @@ The project is not an updater. It is an intelligence and review layer.
 
 Hermes Agent moves quickly. A raw commit list is too noisy, while a GitHub release page can be too broad or stale for a local install.
 
-Rex needs to know:
+A user needs to know:
 
 - What is ahead of my current local Hermes checkout?
 - Which changes affect my daily workflows?
