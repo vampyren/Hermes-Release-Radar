@@ -4,7 +4,7 @@ Hermes Release Radar is a local, safe update-intelligence page for Hermes Agent.
 
 It answers: what changed upstream since the Hermes checkout I am running now, and what actually matters?
 
-Current project version: `0.3.0-public`.
+Current project version: `0.3.1-public`.
 
 ## Current local URL
 

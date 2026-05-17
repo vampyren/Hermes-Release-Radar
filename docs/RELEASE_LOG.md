@@ -4,6 +4,10 @@
 
 - Nothing yet.
 
+## 0.3.1-public - 2026-05-17
+
+- Fixed the public demo workflow to enable GitHub Pages before deployment.
+
 ## 0.3.0-public - 2026-05-17
 
 - Implemented `src/generate_public.py` as a separate GitHub Pages/static demo generator.
