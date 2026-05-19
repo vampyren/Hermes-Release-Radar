@@ -215,7 +215,7 @@ def check_generated_ui_contract(report: Reporter, temp_root: Path) -> None:
         "refresh controls stay below helper text": [".helperbar{display:grid;grid-template-columns:1fr", ".helper-actions", "justify-content:flex-start", "Refreshing: git fetch origin"],
         "category counts are unique primary-category commits": ["unique pending commit(s)", "primary category", "visible category total matches", "jump-unit"],
         "refresh preserves active tab": ["function activeTabHash()", "const activeHash = activeTabHash()", "name.startsWith('cat-')"],
-        "matters cards use representative pending commits": ["Representative commits:", "Representative commit date"],
+        "matters cards use category-grounded pending commits": ["same primary categories as Raw", "Open raw", "small red <b>+N</b> badges", "not the total pending count", "signal-label", "matter-card.good,.matter-card.warn,.matter-card.neutral", "matters-context", "jump-overview", "Show raw-category context", "border:1px solid #264e46", "box-shadow:inset 2px 0 0 #2a6d61"],
     }
     failures = []
     for name, needles in contracts.items():

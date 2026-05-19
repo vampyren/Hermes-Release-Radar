@@ -8,7 +8,11 @@
 - Fixed category jump and raw-section counts to use one primary category per pending commit, so visible category totals match the unique `HEAD..origin/main` commit count.
 - Softened category refresh highlighting and widened/evened category tiles to reduce harsh yellow/brown contrast, awkward line breaks, and uneven grid gaps.
 - Tuned refresh highlight pills to avoid heavy/glowy text while keeping the cyan tile edge accent and using a muted reddish `+N` badge.
+- Overhauled `#matters` into category-grounded update area cards that mirror the Raw tab buckets, avoid stale refresh-count framing, and deep-link into raw category details.
+- Demoted the Raw tab safety note to a quiet footnote unless local Hermes modified files need prominent review.
 - Fixed `#matters` card bullets and representative dates so they are grounded in commits from the current `HEAD..origin/main` missing range.
+- Standardized `#matters` cards on the green/teal edge treatment and replaced the generic `Update area` label with subtle low/medium/critical signal labels.
+- Collapsed secondary `#matters` and Raw category context copy by default, applied the same subtle green jump-tile edge to Raw and Matters, softened near-white text into a muted blue-gray, and matched the `#matters` overview box to the Raw jump box without a left-edge accent.
 - Added graceful first-run handling when the configured Hermes checkout is missing or not a git worktree, including setup guidance in the generated page.
 - Added a smoke-test guard for the missing-checkout first-run page.
 - Documented smoke-test usage in README and operator help.

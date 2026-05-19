@@ -395,46 +395,77 @@ def commit_subject_changes(commits: list[dict[str, Any]], limit: int = 5) -> lis
     return changes or ["Representative commits are listed below; inspect the raw tab for the full audit trail."]
 
 
+def category_matter_description(cat: str) -> str:
+    descriptions = {
+        "Gateway/platforms": "Messaging, voice, Telegram/Discord-style adapters, and platform handoff reliability. Review this first if gateway or chat delivery is daily-critical.",
+        "Dashboard/Web UI": "Browser dashboard and web UI changes. Useful polish, but usually lower risk than gateway/core unless you depend on the dashboard every day.",
+        "CLI/TUI": "Terminal workflow, slash commands, prompts, session handling, and everyday Hermes ergonomics.",
+        "Kanban/multi-agent": "Board/worker orchestration, task dispatch, and multi-agent coordination behavior.",
+        "Core agent/model routing": "Agent loop, providers, OAuth/model routing, schemas, memory/session behavior, and other central runtime paths.",
+        "Tools/toolsets": "Tool calls, browser/search/media/terminal integrations, mutation safety, and agent execution helpers.",
+        "Cron/automation": "Scheduled jobs, background automation, wake/follow-up behavior, and unattended runs.",
+        "Skills": "Reusable skill content and ecosystem additions. Mostly additive unless your workflow depends on a changed skill.",
+        "Install/dependencies": "Install, update, packaging, dependency, and setup paths. Treat this as update-risk relevant.",
+        "Docs": "Documentation and operator guidance. Low runtime risk but useful for understanding new behavior.",
+        "Tests/reliability": "Regression tests and reliability hardening. Usually indirect value, but good evidence that fragile paths are being stabilized.",
+        "Internal/other": "Changes that did not map cleanly to one product area. Skim for unexpected broad refactors or hidden risk.",
+    }
+    return descriptions.get(cat, "Pending changes in this area from the current HEAD..origin/main range.")
+
+
+def category_risk(cat: str, high: int, total: int, dirty: bool) -> str:
+    if cat == "Install/dependencies":
+        base = "Update risk: medium-high; this touches install/update/dependency plumbing."
+    elif cat in {"Gateway/platforms", "Core agent/model routing"}:
+        base = "Update risk: medium; smoke-test your daily chat/provider flow after updating."
+    elif cat in {"CLI/TUI", "Tools/toolsets", "Cron/automation", "Kanban/multi-agent"}:
+        base = "Update risk: low-medium; test the workflow if you use this area heavily."
+    else:
+        base = "Update risk: low; mostly review for relevance unless the commits show broad changes."
+    if dirty:
+        return base + " Local Hermes edits are present, so checkpoint before any update."
+    if high and high >= max(3, total // 3):
+        return base + " This category has a high-impact concentration."
+    return base
+
+
+def importance_summary(commits: list[dict[str, Any]]) -> dict[str, int]:
+    counts = Counter(c.get("importance", "Low") for c in commits)
+    return {"High": counts.get("High", 0), "Medium": counts.get("Medium", 0), "Low": counts.get("Low", 0)}
+
+
 def build_release_notes(data: dict[str, Any]) -> dict[str, Any]:
-    notes: list[dict[str, Any]] = []
-    behind = data.get("behind", 0)
-    high = data.get("importance_counts", {}).get("High", 0)
+    """Build category-grounded #matters content from pending commits only."""
+    behind = int(data.get("behind", 0) or 0)
+    high_total = int(data.get("importance_counts", {}).get("High", 0) or 0)
     dirty = bool(data.get("modified"))
-    clusters = [
-        ("Installability, update safety, and packaging", "Hermes is becoming easier to install and update, with lighter first-run behavior, clearer progress, and less dependency noise during upgrades.", ["update", "install", "postinstall", "wheel", "pypi", "camofox", "dependency", "deps", "uv ", "browser download", "lazy", "windows"], ["Install/dependencies"], ["PyPI/wheel/postinstall paths and lighter lazy dependency handling.", "Visible update/install progress instead of silent hangs.", "Security dependency bumps and supply-chain policy work."], "Update risk: medium-high. Do this as a planned checkpoint because your checkout has local edits and this area touches installation/update plumbing.", "warn"),
-        ("Messaging and gateway reliability", "Telegram, voice, and platform handoff get reliability work: fewer dropped messages, better follow-ups, and platform failures isolated so one bad adapter does not take everything down.", ["gateway", "telegram", "discord", "whatsapp", "signal", "slack", "yuanbao", "line", "simplex", "clarify", "follow-up", "platform", "teams"], ["Gateway/platforms"], ["Per-platform isolation/circuit breakers and status visibility.", "Better rapid follow-up handling during active sessions.", "More platform adapters and richer message/attachment behavior."], "Update risk: medium. Worth it, but verify Telegram + TTS/STT + gateway after updating.", "good"),
-        ("Models, OAuth providers, and local proxy", "Provider and model routing is getting more capable: stronger OAuth handling, xAI/Grok support, local proxy support, and sharper schema compatibility for model/tool calls.", ["provider", "oauth", "xai", "grok", "deepseek", "moonshot", "copilot", "anthropic", "novita", "proxy", "openai-compatible", "reasoning"], ["Core agent/model routing"], ["xAI/Grok OAuth and 1M-context Grok path appear in the release notes.", "Local OpenAI-compatible proxy can let external coding tools use OAuth-backed providers.", "Provider error handling and schema compatibility improved."], "Update risk: medium. Test your normal provider and any OAuth flows after updating.", "good"),
-        ("Agent tools: search, browser, video, vision, computer use", "The tool layer is expanding: more first-class search/browser/media/computer-use tools, better tool routing, and faster safer calls for day-to-day agent work.", ["tool", "x_search", "firecrawl", "image-gen", "video", "vision", "browser", "computer_use", "terminal", "web", "brave", "ddgs"], ["Tools/toolsets"], ["X/Twitter search becomes first-class.", "Vision/video/computer-use/web tooling is broader and more pluggable.", "Browser/tool calls get safety and performance fixes."], "Update risk: low-medium. Mostly additive, but smoke-test browser/tools.", "good"),
-        ("Coding correctness: LSP, mutation verifier, patch/write safety", "Repo-editing gets safer: LSP diagnostics, mutation verification, patch/write checks, and dangerous-command handling reduce silent breakage during agent coding work.", ["lsp", "diagnostic", "mutation", "write_file", "patch", "verifier", "semantic", "dangerous-command", "sanitize", "security"], ["Tools/toolsets", "Core agent/model routing"], ["Semantic diagnostics around writes/patches.", "Per-turn file mutation verification in the release notes.", "More dangerous-command and tool-error safety hardening."], "Update risk: low-medium. Safety/correctness improvements are attractive, but verify patch/write workflow.", "good"),
-        ("Terminal/TUI daily-use polish", "The terminal workflow is smoother: fixes for scrolling, prompts, cursor behavior, markdown tables, background completion, clickable URLs, and session deletion.", ["tui", "cli", "/exit", "cursor", "scroll", "markdown table", "notification", "doctor", "slash", "handoff"], ["CLI/TUI"], ["Cleaner exit/session deletion via `/exit --delete`.", "Better prompt scrolling/escape behavior and cursor handling.", "Clickable URLs and live handoff are highlighted in the official release."], "Update risk: low-medium. Mostly UX, but test your normal TUI loop.", "good"),
-        ("Dashboard, Kanban, and web UI", "Dashboard and Kanban changes are mostly polish and correctness: clearer states, cleaner config behavior, and less noisy analytics UI by default.", ["dashboard", "web", "kanban", "config page", "analytics", "modal", "layout"], ["Dashboard/Web UI", "Kanban/multi-agent"], ["Kanban copy/Ready-state clarification.", "Dashboard config path and UI polish.", "Token/cost analytics hidden behind config by default."], "Update risk: low. Nice polish, not the main update reason by itself.", "neutral"),
-        ("Skills and ecosystem", "Skills are easier to discover and extend: optional skill packs, skills hub work, Hugging Face tap support, and new integrations broaden the reusable workflow library.", ["skill", "skills", "notion", "osint", "pinggy", "comfyui", "evm", "huggingface", "skills-hub"], ["Skills", "Docs"], ["New optional skills and better skill discovery/docs.", "Hugging Face skills tap support.", "Notion/OSINT/Pinggy/Darwinian/ComfyUI/EVM-related additions appear in this range."], "Update risk: low. Mostly additive unless you depend on a changed skill.", "neutral"),
-        ("Cron and autonomous automation", "Scheduled automation gets practical fixes: better cron lookup, gateway/home-target environment handling, and safer async behavior for background jobs.", ["cron", "job", "schedule", "wakeagent"], ["Cron/automation"], ["Name-based cron job operations.", "Gateway/home-target environment fixes.", "Safer async/thread bridge behavior that can affect background automation."], "Update risk: low-medium. Existing cron jobs should be smoke-tested after update.", "good"),
-    ]
-    for title, why, needles, cats, changes, risk, tone in clusters:
-        commits = select_commits(data, needles, cats)
+    cards: list[dict[str, Any]] = []
+    cats = sorted((data.get("category_counts") or {}).items(), key=lambda kv: (-int(kv[1] or 0), kv[0]))
+    for cat, count in cats:
+        commits = list((data.get("category_commits") or {}).get(cat, []))
         if not commits:
             continue
-        # Keep #matters strictly grounded in the current missing range
-        # (HEAD..origin/main). Official release notes may influence which
-        # cluster appears through reachable_release detection elsewhere, but
-        # card bullets/dates/representative commits must come from pending
-        # commits only so the tab answers: what do I not have yet?
-        card_changes = commit_subject_changes(commits)
-        notes.append(release_note_card(title, why, card_changes, risk, commits, tone))
-    if not notes:
-        fallback_commits = list(data.get("recent_commits", []))[:8]
-        notes.append(release_note_card("No clear user-facing cluster detected", "The commit range mostly looks like internal maintenance from the current heuristics.", commit_subject_changes(fallback_commits), "Update risk: unknown; inspect raw commits before updating.", fallback_commits, "neutral"))
+        imp = importance_summary(commits)
+        cards.append({
+            "category": cat,
+            "title": cat,
+            "why": category_matter_description(cat),
+            "changes": commit_subject_changes(commits, limit=6),
+            "risk": category_risk(cat, imp["High"], int(count or 0), dirty),
+            "commits": commits,
+            "count": int(count or 0),
+            "importance": imp,
+            "tone": "warn" if cat == "Install/dependencies" else ("good" if cat in {"Gateway/platforms", "Core agent/model routing", "Tools/toolsets", "Cron/automation"} else "neutral"),
+        })
     if behind == 0:
         recommendation = "You are up to date. No update decision needed."
     elif dirty:
-        recommendation = f"Worth considering, but do not blind-update: {behind} commits are ahead and {high} are tagged high-impact, while local Hermes edits are present. Back up/checkpoint and review dirty files first."
-    elif high >= 20:
-        recommendation = f"Looks worth a planned update: {behind} commits ahead with {high} high-impact candidates. Do it as a checkpointed update, not casually mid-workflow."
+        recommendation = f"Review before updating: {behind} pending commit(s), including {high_total} high-impact candidate(s), and local Hermes edits are present."
+    elif high_total >= 20:
+        recommendation = f"Looks worth a planned update review: {behind} pending commit(s), grouped below by area, with {high_total} high-impact candidate(s)."
     else:
-        recommendation = f"Probably optional: {behind} commits ahead, but only {high} high-impact candidates detected. Review the cards and update when convenient."
-    return {"recommendation": recommendation, "cards": notes}
-
+        recommendation = f"Probably optional for now: {behind} pending commit(s), grouped below by area, with {high_total} high-impact candidate(s)."
+    return {"recommendation": recommendation, "cards": cards}
 
 def build_new_since_refresh(state: dict[str, Any], data: dict[str, Any]) -> dict[str, Any]:
     """Return commits that appeared since the previous upstream refresh.
@@ -563,54 +594,78 @@ def render_release_notes(data: dict[str, Any]) -> str:
     if not data.get("repo_ok", True):
         return render_first_run_setup(data)
     rel = build_release_notes(data)
-    cards_html = []
     refresh = data.get("new_since_refresh", {}) or {}
     new_fulls = set(refresh.get("commit_fulls", []))
-    new_card_count = 0
+
+    def render_matter_jump(card: dict[str, Any]) -> str:
+        cat = card.get("category") or card.get("title", "Area")
+        count = int(card.get("count") or 0)
+        is_new = bool(new_fulls and any(c.get("full") in new_fulls for c in card.get("commits", [])))
+        new_count = sum(1 for c in card.get("commits", []) if c.get("full") in new_fulls)
+        label = "commit" if count == 1 else "commits"
+        badge = f'<em class="jump-new" title="Newly discovered on the last upstream refresh">+{new_count}</em>' if new_count else ""
+        return (
+            f'<a class="jump{" new-update" if is_new else ""}" href="#{anchor_id("matter", cat)}" title="{count} pending {label} in {html.escape(cat)}">'
+            f'<span class="jump-label">{html.escape(cat)}</span>'
+            f'<span class="jump-meta"><span class="jump-count">{count}</span><span class="jump-unit">{label}</span>{badge}</span>'
+            f'</a>'
+        )
+
+    cards_html = []
     for card in rel["cards"]:
+        cat = card.get("category") or card.get("title", "Area")
         changes = "".join(f"<li>{html.escape(item)}</li>" for item in card["changes"])
         refs = commit_refs(card["commits"])
-        refs_html = f'<div class="commit-ref-block"><div class="muted">Representative commits:</div><div class="commit-ref-row">{refs}</div></div>' if refs else ""
+        refs_html = f'<div class="commit-ref-block"><div class="muted">Representative pending commits:</div><div class="commit-ref-row">{refs}</div></div>' if refs else ""
         commit_dates = sorted({c.get("date", "") for c in card.get("commits", []) if c.get("date")})
         if commit_dates:
             if len(commit_dates) == 1:
-                date_html = f'<p class="card-date">Representative commit date: <time>{html.escape(commit_dates[-1])}</time></p>'
+                date_html = f'<p class="card-date">Pending commit date: <time>{html.escape(commit_dates[-1])}</time></p>'
             else:
-                date_html = f'<p class="card-date">Representative commit dates: <time>{html.escape(commit_dates[0])}</time> → <time>{html.escape(commit_dates[-1])}</time></p>'
+                date_html = f'<p class="card-date">Pending commit dates: <time>{html.escape(commit_dates[0])}</time> → <time>{html.escape(commit_dates[-1])}</time></p>'
         else:
-            date_label = (data.get("latest_release", {}).get("published_at") or "")[:10] or "unknown"
-            date_html = f'<p class="card-date">Release published: <time>{html.escape(date_label)}</time></p>'
+            date_html = '<p class="card-date">Pending commit dates: <time>unknown</time></p>'
+        imp = card.get("importance", {}) or {}
+        high = int(imp.get("High", 0) or 0)
+        med = int(imp.get("Medium", 0) or 0)
+        low = int(imp.get("Low", 0) or 0)
         tone = html.escape(card.get("tone") or "neutral")
+        if high >= 10:
+            signal_class, signal_label = "critical", "Critical"
+        elif high or med:
+            signal_class, signal_label = "medium", "Medium"
+        else:
+            signal_class, signal_label = "low", "Low"
         is_new = bool(new_fulls and any(c.get("full") in new_fulls for c in card.get("commits", [])))
-        if is_new:
-            new_card_count += 1
-        new_badge = '<span class="new-badge">● new this refresh</span>' if is_new else ""
+        new_count = sum(1 for c in card.get("commits", []) if c.get("full") in new_fulls)
+        new_badge = f'<span class="new-badge">● +{new_count} refresh</span>' if new_count else ""
+        raw_link = anchor_id("cat", cat)
         cards_html.append(
-            f'<article class="release-card {tone}{" new-update" if is_new else ""}">'
-            f'<div class="row spread"><h3>{html.escape(card["title"])}</h3>{new_badge}</div>'
+            f'<article id="{anchor_id("matter", cat)}" class="release-card matter-card {tone}{" new-update" if is_new else ""}">'
+            f'<div class="row spread"><div><p class="signal-label {signal_class}"><span class="signal-dot"></span>{signal_label}</p><h3>{html.escape(cat)}</h3></div>{new_badge}</div>'
+            f'<div class="matter-stats"><span><b>{int(card.get("count") or 0)}</b> pending</span><span><b>{high}</b> high</span><span><b>{med}</b> medium</span><span><b>{low}</b> low</span></div>'
             f'<p class="why">{html.escape(card["why"])}</p>'
-            f'<ul>{changes}</ul>'
+            f'<h4>Most relevant pending changes</h4><ul>{changes}</ul>'
             f'<p class="risk">{html.escape(card["risk"])}</p>'
             f'{refs_html}'
             f'{date_html}'
+            f'<p class="matter-actions"><a class="openlink" href="#{raw_link}">Open raw {html.escape(cat)} commits</a></p>'
             f'</article>'
         )
-    if refresh.get("commit_count"):
-        banner = f'<p class="new-refresh-banner"><b>{refresh.get("commit_count", 0)} new upstream commit(s)</b> since your last refresh. Highlighted cards/categories contain at least one of them.</p>'
-    else:
-        banner = '<p class="muted compact-note">No new upstream commits since the previous refresh.</p>'
-    if new_card_count:
-        banner += f'<p class="muted compact-note">{new_card_count} impact card(s) have fresh commits.</p>'
+    jump_html = "".join(render_matter_jump(card) for card in rel["cards"]) or '<p class="muted">No pending update areas yet.</p>'
+    refresh_note = '<p class="muted compact-note">When present, small red <b>+N</b> badges mark commits discovered by the last upstream refresh; they are not the total pending count.</p>'
     return (
-        '<section class="card release-notes">'
+        '<section class="card release-notes matters-overview">'
         '<div class="row"><h2>What actually matters</h2><span class="pill high">Local review</span></div>'
-        f'{banner}'
         f'<p class="recommendation">{html.escape(rel["recommendation"])}</p>'
-        '<p class="muted">All impact cards are shown here. This combines official release notes with local commit/file heuristics; raw commits stay in the Raw categorized commits tab for auditability.</p>'
-        f'<div id="impactGrid" class="release-grid">{"".join(cards_html)}</div>'
+        '<details class="matters-context"><summary>Show update-range context</summary>'
+        f'<p class="muted">This view is grouped by the same primary categories as Raw and only uses commits in the current <code>HEAD..origin/main</code> range.</p>'
+        f'{refresh_note}'
+        '</details>'
+        f'<div class="jumpgrid matters-jump" aria-label="Jump to category">{jump_html}</div>'
         '</section>'
+        f'<div id="impactGrid" class="release-grid matter-grid">{"".join(cards_html)}</div>'
     )
-
 
 def render_markers_section(data: dict[str, Any], today_sv: str) -> str:
     return f'''<section class="card"><details><summary><h2>Review markers</h2><span class="muted">Hidden by default · use Mark all most of the time</span></summary><p class="muted">Server-side <code>state.json</code> is canonical. With the helper service online, marker buttons save to disk and regenerate this page.</p><div class="marker-controls"><input id="markerLabel" placeholder="Optional marker label"><button class="date-chip" title="Use today as marker label" onclick="useTodayLabel()">Use {today_sv}</button><button onclick="markAllCategories()">Mark all categories reviewed</button><button class="danger" onclick="clearMarkers()">Clear all markers</button></div><div id="topMarkerLine" class="section-marker" data-marker-slot="top"></div><div id="markers"></div><p id="newSince" class="muted"></p></details></section>'''
@@ -685,7 +740,11 @@ def render_page(data: dict[str, Any], state: dict[str, Any]) -> str:
         f'<ul>' + "".join(f'<li>{html.escape(f)}</li>' for f in c["files"]) + '</ul></details>'
         for c in data["recent_commits"]
     ) or '<section class="card"><p class="muted">No raw commits are available until Release Radar can read the Hermes checkout.</p></section>'
-    modified = "".join(f"<li><code>{html.escape(m)}</code></li>" for m in data["modified"]) or "<li>None</li>"
+    modified = "".join(f"<li><code>{html.escape(m)}</code></li>" for m in data["modified"])
+    if modified:
+        safety_note = f'<section class="card warn"><h2>Local Hermes modified files</h2><p>Review these before any approved Hermes update:</p><ul>{modified}</ul><p class="muted">Safety: Release Radar inspected git/release data only. It did not update, install, restart, reset, stash, or modify Hermes source.</p></section>'
+    else:
+        safety_note = '<p class="muted safety-footnote">Safety: this page inspected git/release data only; it did not update, install, restart, reset, stash, or modify Hermes source.</p>'
     version = data.get("current_version", {})
     latest = data.get("latest_release", {})
     history_count = len(state.get("history", []))
@@ -696,8 +755,8 @@ def render_page(data: dict[str, Any], state: dict[str, Any]) -> str:
 <title>Hermes Release Radar</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,{FAVICON_DATA}">
 <style>
-:root {{ color-scheme: dark; --bg:#0b1014; --panel:#121a21; --text:#e7f0f4; --muted:#91a4af; --accent:#62e6c8; --warn:#ffc857; --bad:#ff6b6b; --line:#26343d; --marker:#62e6c8; }}
-*{{box-sizing:border-box;min-width:0}} html{{scroll-behavior:smooth;overflow-x:hidden}} body{{margin:0;width:100%;max-width:100%;overflow-x:hidden;background:radial-gradient(circle at 15% 0,#18342f 0,#0b1014 34rem);color:var(--text);font:15px/1.45 system-ui,-apple-system,Segoe UI,sans-serif}} main{{width:100%;max-width:1180px;margin:auto;padding:18px;overflow-wrap:anywhere}} h1{{font-size:clamp(24px,6vw,32px);margin:0 0 4px}} h2{{margin:20px 0 9px}} h3{{margin:0}} a{{color:#a8e9ff}} code{{background:#0b1419;border:1px solid var(--line);border-radius:7px;padding:2px 6px;white-space:normal;overflow-wrap:anywhere;word-break:break-word}} pre{{white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word;max-width:100%;overflow-x:auto}} button{{background:#183831;color:var(--text);border:1px solid #2b6d60;border-radius:10px;padding:8px 10px;cursor:pointer;max-width:100%;white-space:normal;text-align:left}} button:hover{{background:#205347}} summary{{cursor:pointer}} details>summary h2{{display:inline;margin-right:10px}} .danger{{background:#3a1b22;border-color:#7d3543}} .status-badge{{display:inline-flex;align-items:center;border-radius:999px;padding:4px 10px;border:1px solid var(--line);font-weight:700}} .status-badge.online{{background:#123a2e;color:#7ff6d7;border-color:#2b8a71}} .status-badge.offline{{background:#3a1b22;color:#ffb3b3;border-color:#7d3543}} .openlink{{display:inline-flex;align-items:center;min-height:34px;padding:0 10px;border:1px solid #315a7e;border-radius:10px;background:#102239;color:#d9ecff;text-decoration:none}} .topbar{{border-bottom:1px solid var(--line);background:#0b1014aa;position:sticky;top:0;z-index:2;backdrop-filter:blur(8px)}} .topbar main{{padding:8px 18px}} .brand{{display:inline-flex;align-items:center;gap:9px;font-weight:800;letter-spacing:.01em;white-space:nowrap;color:var(--text);text-decoration:none}} .brand .app-icon{{width:30px;height:30px;flex:0 0 auto;filter:drop-shadow(0 0 10px #62e6c833)}} .navlinks a{{margin-left:10px;text-decoration:none}} .navlinks .help-icon{{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border:1px solid #315a7e;border-radius:999px;background:#102239;color:#d9ecff;font-weight:900;line-height:1}} .helperbar{{display:grid;grid-template-columns:1fr;align-items:start;gap:10px;background:#0e171d;border:1px solid #21313b;border-radius:14px;padding:10px 12px;margin:0 0 12px;box-shadow:0 8px 20px #0003}} .helperbar p{{margin:2px 0 0}} .helper-actions{{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-start;justify-content:flex-start;min-width:0}} .tabs{{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0 8px;position:sticky;top:48px;z-index:1;background:#0b1014cc;padding:8px 0;backdrop-filter:blur(8px)}} .tabbtn{{background:#0e171d;border-color:var(--line);font-weight:800}} .tabbtn.active{{background:#183831;border-color:#2b8a71;color:#dffbf5}} .tab-panel{{display:none}} .tab-panel.active{{display:block}} .summary-strip{{display:grid;grid-template-columns:1.1fr repeat(5,.65fr);gap:8px;margin:8px 0 12px}} .summary-item{{background:#101820;border:1px solid #21313b;border-radius:12px;padding:8px 10px;min-height:56px;display:flex;flex-direction:column;justify-content:center;box-shadow:0 8px 20px #0003}} .summary-label{{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}} .summary-value{{font-size:17px;font-weight:800;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}} .summary-value code{{font-size:15px;padding:1px 5px}} .summary-sub{{font-size:12px;color:#ffc857;margin-top:2px}} @media(max-width:960px){{.summary-strip{{grid-template-columns:repeat(3,1fr)}}}} @media(max-width:560px){{.summary-strip{{grid-template-columns:repeat(2,1fr)}}}} .card,.commit{{background:linear-gradient(180deg,var(--panel),#10171d);border:1px solid var(--line);border-radius:16px;padding:14px;margin:10px 0;box-shadow:0 12px 30px #0005;width:100%;max-width:100%;overflow:hidden}} .muted{{color:var(--muted)}} .row{{display:flex;gap:10px;align-items:center;justify-content:flex-start;flex-wrap:wrap}} .spread{{justify-content:space-between}} .jumpgrid{{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(260px,100%),1fr));gap:10px;align-items:stretch}} .jump{{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:12px;text-decoration:none;background:#0e171d;border:1px solid #24333c;border-radius:12px;padding:10px 12px;min-height:58px;line-height:1.18;color:var(--text)}} .jump-label{{font-weight:750;overflow-wrap:normal;word-break:normal;hyphens:none}} .jump-meta{{display:inline-flex;align-items:center;justify-content:flex-end;gap:6px;flex-wrap:nowrap;white-space:nowrap}} .jump-count{{font-weight:800;color:#dceff4}} .jump-unit{{font-size:11px;color:var(--muted)}} .warn{{border-color:#7a5b20}} .pill{{border-radius:999px;padding:2px 8px;border:1px solid var(--line);font-size:12px}} .pill.high{{background:#3a2b12;color:#ffd98a}} .pill.medium{{background:#1d3042;color:#b9ddff}} .pill.low{{background:#172317;color:#b8f0be}} .marker-controls{{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}} input{{background:#0b1419;color:var(--text);border:1px solid var(--line);border-radius:10px;padding:9px 10px;min-width:min(280px,100%)}} .marker{{display:flex;justify-content:space-between;gap:8px;align-items:center;border:1px solid var(--line);border-radius:12px;padding:8px;margin:7px 0;background:#0e171d}} .section-marker{{display:none}} .section-marker.visible,.inserted-marker{{display:block;margin:12px 0}} .marker-line{{border:0;border-top:2px solid var(--marker)}} .inline-marker-row{{display:flex;gap:8px;justify-content:space-between;align-items:center;flex-wrap:wrap;background:#0c2722;border:1px solid #276e61;border-radius:12px;padding:8px}} .category-card.collapsed .category-commits li.extra,#markers.collapsed .marker.extra{{display:none}} .showmore{{background:#102239;border-color:#315a7e}} .category-commits li,.highlight-list li{{margin:7px 0}} .release-notes,.official-release{{border-color:#315a7e;background:linear-gradient(180deg,#111d27,#0f171d)}} .recommendation{{font-size:17px;font-weight:800;color:#dffbf5}} .release-grid{{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(330px,100%),1fr));gap:12px;align-items:start}} .release-card{{background:#0e171d;border:1px solid var(--line);border-radius:14px;padding:13px;display:flex;flex-direction:column}} .release-card.good{{border-color:#2b6d60}} .release-card.warn{{border-color:#8a6a2d}} .release-card h3{{margin-bottom:8px}} .release-card .why{{color:#dce9ee}} .release-card .risk{{color:#ffd98a;font-weight:650;margin:12px 0 10px}} .commit-ref-block{{margin:8px 0 10px}} .commit-ref-row{{display:flex;gap:4px;flex-wrap:wrap;margin-top:4px}} .card-date{{margin:8px 0 0;padding-top:8px;color:#91a4af;font-size:12px;border-top:1px solid #1f2d35}} .card-date time{{color:#c7d7de}} .new-refresh-banner{{margin:8px 0 10px;padding:8px 10px;border:1px solid #9b7b29;border-radius:12px;background:#211a0b;color:#ffe3a1}} .compact-note{{margin:4px 0 8px}} .new-badge{{display:inline-flex;align-items:center;gap:4px;border:1px solid #2f7180;border-radius:999px;background:#102832;color:#bfeef5;font-size:12px;font-weight:650;padding:2px 8px;white-space:nowrap}} .release-card.new-update{{border-color:var(--line);box-shadow:none}} .category-card.new-update{{border-color:#2f7180;box-shadow:none}} .jump.new-update{{border-color:#2f7180;background:linear-gradient(180deg,#102832,#0e171d);color:var(--text);font-weight:inherit;box-shadow:inset 3px 0 0 #38b6c9}} .jump-new{{font-style:normal;border-radius:999px;background:#3a1f25;color:#ffc6cc;border:1px solid #b85b68;padding:2px 7px;line-height:1.25;min-width:0;font-size:12px;font-weight:650}} .category-commits li.new-commit{{background:#102832;border-left:3px solid #38b6c9;border-radius:8px;padding:5px 7px}} .new-dot{{display:inline-block;margin-left:6px;border-radius:999px;background:#3a1f25;color:#ffc6cc;border:1px solid #b85b68;font-size:11px;font-weight:650;padding:1px 6px}} .highlight-list{{padding-left:20px}} .version-line{{font-size:16px}} @media(max-width:760px){{.helperbar{{grid-template-columns:1fr}} .helper-actions{{justify-content:flex-start;min-width:0}}}}
+:root {{ color-scheme: dark; --bg:#0b1014; --panel:#121a21; --text:#c7d7dc; --muted:#91a4af; --accent:#62e6c8; --warn:#ffc857; --bad:#ff6b6b; --line:#26343d; --marker:#62e6c8; }}
+*{{box-sizing:border-box;min-width:0}} html{{scroll-behavior:smooth;overflow-x:hidden}} body{{margin:0;width:100%;max-width:100%;overflow-x:hidden;background:radial-gradient(circle at 15% 0,#18342f 0,#0b1014 34rem);color:var(--text);font:15px/1.45 system-ui,-apple-system,Segoe UI,sans-serif}} main{{width:100%;max-width:1180px;margin:auto;padding:18px;overflow-wrap:anywhere}} h1{{font-size:clamp(24px,6vw,32px);margin:0 0 4px}} h2{{margin:20px 0 9px}} h3{{margin:0}} a{{color:#a8e9ff}} code{{background:#0b1419;border:1px solid var(--line);border-radius:7px;padding:2px 6px;white-space:normal;overflow-wrap:anywhere;word-break:break-word}} pre{{white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word;max-width:100%;overflow-x:auto}} button{{background:#183831;color:var(--text);border:1px solid #2b6d60;border-radius:10px;padding:8px 10px;cursor:pointer;max-width:100%;white-space:normal;text-align:left}} button:hover{{background:#205347}} summary{{cursor:pointer}} details>summary h2{{display:inline;margin-right:10px}} .danger{{background:#3a1b22;border-color:#7d3543}} .status-badge{{display:inline-flex;align-items:center;border-radius:999px;padding:4px 10px;border:1px solid var(--line);font-weight:700}} .status-badge.online{{background:#123a2e;color:#7ff6d7;border-color:#2b8a71}} .status-badge.offline{{background:#3a1b22;color:#ffb3b3;border-color:#7d3543}} .openlink{{display:inline-flex;align-items:center;min-height:34px;padding:0 10px;border:1px solid #315a7e;border-radius:10px;background:#102239;color:#d9ecff;text-decoration:none}} .topbar{{border-bottom:1px solid var(--line);background:#0b1014aa;position:sticky;top:0;z-index:2;backdrop-filter:blur(8px)}} .topbar main{{padding:8px 18px}} .brand{{display:inline-flex;align-items:center;gap:9px;font-weight:800;letter-spacing:.01em;white-space:nowrap;color:var(--text);text-decoration:none}} .brand .app-icon{{width:30px;height:30px;flex:0 0 auto;filter:drop-shadow(0 0 10px #62e6c833)}} .navlinks a{{margin-left:10px;text-decoration:none}} .navlinks .help-icon{{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border:1px solid #315a7e;border-radius:999px;background:#102239;color:#d9ecff;font-weight:900;line-height:1}} .helperbar{{display:grid;grid-template-columns:1fr;align-items:start;gap:10px;background:#0e171d;border:1px solid #21313b;border-radius:14px;padding:10px 12px;margin:0 0 12px;box-shadow:0 8px 20px #0003}} .helperbar p{{margin:2px 0 0}} .helper-actions{{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-start;justify-content:flex-start;min-width:0}} .tabs{{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0 8px;position:sticky;top:48px;z-index:1;background:#0b1014cc;padding:8px 0;backdrop-filter:blur(8px)}} .tabbtn{{background:#0e171d;border-color:var(--line);font-weight:800}} .tabbtn.active{{background:#183831;border-color:#2b8a71;color:#dffbf5}} .tab-panel{{display:none}} .tab-panel.active{{display:block}} .summary-strip{{display:grid;grid-template-columns:1.1fr repeat(5,.65fr);gap:8px;margin:8px 0 12px}} .summary-item{{background:#101820;border:1px solid #21313b;border-radius:12px;padding:8px 10px;min-height:56px;display:flex;flex-direction:column;justify-content:center;box-shadow:0 8px 20px #0003}} .summary-label{{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}} .summary-value{{font-size:17px;font-weight:800;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}} .summary-value code{{font-size:15px;padding:1px 5px}} .summary-sub{{font-size:12px;color:#ffc857;margin-top:2px}} @media(max-width:960px){{.summary-strip{{grid-template-columns:repeat(3,1fr)}}}} @media(max-width:560px){{.summary-strip{{grid-template-columns:repeat(2,1fr)}}}} .card,.commit{{background:linear-gradient(180deg,var(--panel),#10171d);border:1px solid var(--line);border-radius:16px;padding:14px;margin:10px 0;box-shadow:0 12px 30px #0005;width:100%;max-width:100%;overflow:hidden}} .muted{{color:var(--muted)}} .row{{display:flex;gap:10px;align-items:center;justify-content:flex-start;flex-wrap:wrap}} .spread{{justify-content:space-between}} .jumpgrid{{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(260px,100%),1fr));gap:10px;align-items:stretch}} .jump{{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:12px;text-decoration:none;background:#0e171d;border:1px solid #264e46;border-radius:12px;padding:10px 12px;min-height:58px;line-height:1.18;color:var(--text);box-shadow:inset 2px 0 0 #2a6d61}} .jump-label{{font-weight:750;color:#c7d7dc;overflow-wrap:normal;word-break:normal;hyphens:none}} .jump-meta{{display:inline-flex;align-items:center;justify-content:flex-end;gap:6px;flex-wrap:nowrap;white-space:nowrap}} .jump-count{{font-weight:800;color:#c7d7dc}} .jump-unit{{font-size:11px;color:var(--muted)}} .warn{{border-color:#7a5b20}} .pill{{border-radius:999px;padding:2px 8px;border:1px solid var(--line);font-size:12px}} .pill.high{{background:#3a2b12;color:#ffd98a}} .pill.medium{{background:#1d3042;color:#b9ddff}} .pill.low{{background:#172317;color:#b8f0be}} .marker-controls{{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}} input{{background:#0b1419;color:var(--text);border:1px solid var(--line);border-radius:10px;padding:9px 10px;min-width:min(280px,100%)}} .marker{{display:flex;justify-content:space-between;gap:8px;align-items:center;border:1px solid var(--line);border-radius:12px;padding:8px;margin:7px 0;background:#0e171d}} .section-marker{{display:none}} .section-marker.visible,.inserted-marker{{display:block;margin:12px 0}} .marker-line{{border:0;border-top:2px solid var(--marker)}} .inline-marker-row{{display:flex;gap:8px;justify-content:space-between;align-items:center;flex-wrap:wrap;background:#0c2722;border:1px solid #276e61;border-radius:12px;padding:8px}} .category-card.collapsed .category-commits li.extra,#markers.collapsed .marker.extra{{display:none}} .showmore{{background:#102239;border-color:#315a7e}} .category-commits li,.highlight-list li{{margin:7px 0}} .release-notes,.official-release{{border-color:#315a7e;background:linear-gradient(180deg,#111d27,#0f171d)}} .recommendation{{font-size:17px;font-weight:800;color:#c7d7dc}} .release-grid{{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(330px,100%),1fr));gap:12px;align-items:start}} .matter-grid{{grid-template-columns:repeat(auto-fit,minmax(min(360px,100%),1fr));margin-top:12px}} .release-card{{background:#0e171d;border:1px solid var(--line);border-radius:14px;padding:13px;display:flex;flex-direction:column}} .matter-card{{background:linear-gradient(180deg,#101c24,#0d151b);border-color:#2b6d60;box-shadow:inset 3px 0 0 #2b8f78}} .matter-card.good,.matter-card.warn,.matter-card.neutral{{border-color:#2b6d60}} .release-card.good{{border-color:#2b6d60}} .release-card.warn{{border-color:#2b6d60}} .release-card h3{{margin-bottom:8px}} .release-card h4{{margin:12px 0 6px;color:#cfe8ef;font-size:13px;text-transform:uppercase;letter-spacing:.04em}} .release-card .why{{color:#dce9ee}} .release-card .risk{{color:#ffd98a;font-weight:650;margin:12px 0 10px}} .signal-label{{display:inline-flex;align-items:center;gap:6px;margin:0 0 4px;color:#96acb7;font-size:11px;text-transform:uppercase;letter-spacing:.08em;font-weight:650}} .signal-dot{{width:8px;height:8px;border-radius:999px;background:#67e5c3;box-shadow:0 0 8px #67e5c344}} .signal-label.medium .signal-dot{{background:#d7b75e;box-shadow:0 0 8px #d7b75e33}} .signal-label.critical .signal-dot{{background:#e66d73;box-shadow:0 0 9px #e66d7344}} .signal-label.low{{color:#8fcfbe}} .signal-label.medium{{color:#d4be78}} .signal-label.critical{{color:#efa0a5}} .eyebrow{{margin:0 0 2px;color:#77b9c6;font-size:11px;text-transform:uppercase;letter-spacing:.08em}} .matter-stats{{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin:8px 0 10px}} .matter-stats span{{border:1px solid #21323b;border-radius:10px;background:#0b1419;padding:6px 8px;color:#9fb3bd;font-size:12px}} .matter-stats b{{display:block;color:#e6f4f7;font-size:17px;line-height:1.1}} .matter-actions{{margin-top:auto;padding-top:8px}} .matters-overview,.jump-overview{{position:relative;border-color:#264e46;box-shadow:0 12px 30px #0005}} .matters-context{{margin:2px 0 10px;color:var(--muted)}} .matters-context summary{{display:inline-flex;color:#9fcfc6;font-size:13px;border:1px solid #264e46;border-radius:999px;padding:3px 9px;background:#0d1b1b}} .matters-context p{{margin:8px 0 0}} .commit-ref-block{{margin:8px 0 10px}} .commit-ref-row{{display:flex;gap:4px;flex-wrap:wrap;margin-top:4px}} .card-date{{margin:8px 0 0;padding-top:8px;color:#91a4af;font-size:12px;border-top:1px solid #1f2d35}} .card-date time{{color:#c7d7de}} .new-refresh-banner{{margin:8px 0 10px;padding:8px 10px;border:1px solid #9b7b29;border-radius:12px;background:#211a0b;color:#ffe3a1}} .compact-note{{margin:4px 0 8px}} .new-badge{{display:inline-flex;align-items:center;gap:4px;border:1px solid #2f7180;border-radius:999px;background:#102832;color:#bfeef5;font-size:12px;font-weight:650;padding:2px 8px;white-space:nowrap}} .release-card.new-update{{border-color:var(--line);box-shadow:none}} .matter-card.new-update{{border-color:#2b6d60;box-shadow:inset 3px 0 0 #2b8f78}} .category-card.new-update{{border-color:#2f7180;box-shadow:none}} .jump.new-update{{border-color:#264e46;background:linear-gradient(180deg,#102832,#0e171d);color:var(--text);font-weight:inherit;box-shadow:inset 2px 0 0 #2a6d61}} .jump-new{{font-style:normal;border-radius:999px;background:#3a1f25;color:#ffc6cc;border:1px solid #b85b68;padding:2px 7px;line-height:1.25;min-width:0;font-size:12px;font-weight:650}} .category-commits li.new-commit{{background:#102832;border-left:3px solid #38b6c9;border-radius:8px;padding:5px 7px}} .new-dot{{display:inline-block;margin-left:6px;border-radius:999px;background:#3a1f25;color:#ffc6cc;border:1px solid #b85b68;font-size:11px;font-weight:650;padding:1px 6px}} .highlight-list{{padding-left:20px}} .version-line{{font-size:16px}} @media(max-width:760px){{.helperbar{{grid-template-columns:1fr}} .helper-actions{{justify-content:flex-start;min-width:0}}}}
 </style></head><body>
 <div id="top" class="topbar"><main class="row spread"><a class="brand" href="index.html" aria-label="Hermes Release Radar home">{APP_ICON_SVG}<span>Hermes Release Radar</span></a><span class="navlinks"><a href="index.html">Current</a><a href="history.html">History ({history_count})</a><a class="help-icon" href="help.html" title="Help / setup commands" aria-label="Help / setup commands">?</a></span></main></div>
 <main>
@@ -715,8 +774,8 @@ def render_page(data: dict[str, Any], state: dict[str, Any]) -> str:
 <section id="tab-official" class="tab-panel active">{official}</section>
 <section id="tab-matters" class="tab-panel">{release_notes}</section>
 <section id="tab-raw" class="tab-panel">
-<section class="card"><h2>Jump to category</h2><p class="muted">Raw commit groups are here for auditability. <b>{data['behind']}</b> unique pending commit(s) are in the current <code>HEAD..origin/main</code> range. Category numbers below use each commit’s primary category, so the visible category total matches the unique pending count.</p><div class="jumpgrid">{cat_nav}</div></section>
-<section class="card warn"><h2>Update safety note</h2><p>This page only inspected git/release data. It did not install, update, restart, reset, stash, or modify Hermes source.</p><p>Local modified files detected:</p><ul>{modified}</ul></section>
+<section class="card jump-overview"><h2>Jump to category</h2><details class="matters-context"><summary>Show raw-category context</summary><p class="muted">Raw commit groups are here for auditability. <b>{data['behind']}</b> unique pending commit(s) are in the current <code>HEAD..origin/main</code> range. Category numbers below use each commit’s primary category, so the visible category total matches the unique pending count.</p></details><div class="jumpgrid">{cat_nav}</div></section>
+{safety_note}
 {render_markers_section(data, today_sv)}
 <section class="card"><h2>Current installed state</h2><pre>{html.escape(data['version_output'])}\n{html.escape(data['status'])}</pre><p>Baseline checkpoint: <code>{html.escape(state.get('baseline_commit','')[:12])}</code> — {html.escape(state.get('baseline_label',''))}</p></section>
 <h2>Raw categorized commits</h2>{cat_cards}
