@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+No unreleased changes.
+
+## 0.4.2-local - 2026-05-19
+
 - Polished the top summary strip: the Status card now keeps the Online/Offline badge centered on the right while the status text remains readable, and the Latest card has enough room for the current release label without truncation.
 
 ## 0.4.1-local - 2026-05-19
