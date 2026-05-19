@@ -18,6 +18,8 @@ Release Radar is a local product, not a hosted demo.
 
 A user downloads this repo, runs the helper locally, and Release Radar checks that user's own Hermes checkout. First run initializes that user's own `state.json` from their own checkout, then future refreshes preserve their review markers and installed-update history.
 
+If the Hermes checkout is missing on first run, the generated page now opens in a setup-needed state instead of crashing. It explains which path was checked, how to set `RELEASE_RADAR_HERMES_REPO`, and confirms that Release Radar still does not run `hermes update`.
+
 GitHub presentation is handled by README/docs/screenshots. The previous separate public demo generator and GitHub Pages rebuild path were intentionally removed to keep one generator and avoid drift.
 
 ## What it does
@@ -119,6 +121,14 @@ curl -s http://127.0.0.1:8765/api/status
 curl -s -X POST http://127.0.0.1:8765/api/refresh
 ```
 
+Run the safe smoke test from the repo checkout:
+
+```bash
+python3 scripts/smoke_test.py
+```
+
+The smoke test checks repo files, Python syntax, a temporary-root generator run, the missing-checkout first-run page, installed runtime files, `state.json`, and the local helper API when it is running. It does not update Hermes, fetch upstream, restart services, install packages, or mutate the Hermes checkout.
+
 ## Repository layout
 
 ```text
@@ -128,6 +138,7 @@ systemd/hermes-release-radar.service     User systemd service
 docs/help.html                           Rendered help page
 docs/RELEASE_LOG.md                      Project changelog
 scripts/render_help.py                   Markdown-to-help HTML renderer
+scripts/smoke_test.py                    Safe health/smoke verification
 HELP.md                                  Operator help
 README.md                                Project overview
 PURPOSE.md                               Project purpose and principles
@@ -157,7 +168,6 @@ gh release create vX.Y.Z-suffix --title "vX.Y.Z-suffix" --notes-file /tmp/releas
 ## Verification
 
 ```bash
-python3 -m py_compile src/generate.py src/serve.py
-python3 ~/.hermes/release-radar/generate.py
-curl -s http://127.0.0.1:8765/api/status
+python3 scripts/smoke_test.py
+python3 -m py_compile src/generate.py src/serve.py scripts/render_help.py scripts/smoke_test.py
 ```

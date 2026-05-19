@@ -26,7 +26,7 @@ http://127.0.0.1:8765/
 - Linux with user systemd.
 - Python 3 at `/usr/bin/python3`.
 - Git available.
-- Existing Hermes Agent checkout at `~/.hermes/hermes-agent`.
+- Existing Hermes Agent checkout at `~/.hermes/hermes-agent`, or set `RELEASE_RADAR_HERMES_REPO` to the checkout path.
 - Do not expose port `8765` outside localhost without authentication.
 
 ## Configuration
@@ -41,6 +41,8 @@ RELEASE_RADAR_PORT=8765
 ```
 
 Set these environment variables only if your Hermes checkout, runtime folder, host, or port differs.
+
+If the Hermes checkout is missing on first run, Release Radar still generates a page. The page shows a setup-needed message with the checked path and the `RELEASE_RADAR_HERMES_REPO` override instead of failing with a traceback. It still does not run `hermes update`.
 
 ## Short installation
 
@@ -162,6 +164,15 @@ Check the helper API:
 curl -s http://127.0.0.1:8765/api/status
 ```
 
+Run the safe smoke test from the repo checkout:
+
+```bash
+cd ~/Apps/Hermes-Release-Radar
+python3 scripts/smoke_test.py
+```
+
+The smoke test checks repo files, Python syntax, a temporary-root generator run, the missing-checkout first-run page, installed runtime files, `state.json`, and the local helper API when it is running. It does not run `hermes update`, fetch upstream, restart services, install packages, or mutate the Hermes checkout.
+
 Refresh upstream data and regenerate the page:
 
 ```bash
@@ -197,7 +208,8 @@ The service does not currently implement `systemctl --user reload hermes-release
 ## Safety checklist
 
 Before publishing or changing the service, verify:
-- `python3 -m py_compile ~/.hermes/release-radar/generate.py ~/.hermes/release-radar/serve.py` passes.
+- `python3 scripts/smoke_test.py` passes from the repo checkout.
+- `python3 -m py_compile src/generate.py src/serve.py scripts/render_help.py scripts/smoke_test.py` passes.
 - `python3 ~/.hermes/release-radar/generate.py` regenerates `index.html`.
 - `systemctl --user status hermes-release-radar.service` is healthy.
 - `curl -s http://127.0.0.1:8765/api/status` returns `"ok": true`.

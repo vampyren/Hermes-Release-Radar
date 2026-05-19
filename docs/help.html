@@ -80,7 +80,7 @@ pre code {
 <li>Linux with user systemd.</li>
 <li>Python 3 at <code>/usr/bin/python3</code>.</li>
 <li>Git available.</li>
-<li>Existing Hermes Agent checkout at <code>~/.hermes/hermes-agent</code>.</li>
+<li>Existing Hermes Agent checkout at <code>~/.hermes/hermes-agent</code>, or set <code>RELEASE_RADAR_HERMES_REPO</code> to the checkout path.</li>
 <li>Do not expose port <code>8765</code> outside localhost without authentication.</li>
 </ul>
 <h2>Configuration</h2>
@@ -90,6 +90,7 @@ RELEASE_RADAR_ROOT=~/.hermes/release-radar
 RELEASE_RADAR_HOST=127.0.0.1
 RELEASE_RADAR_PORT=8765</code></pre></div>
 <p>Set these environment variables only if your Hermes checkout, runtime folder, host, or port differs.</p>
+<p>If the Hermes checkout is missing on first run, Release Radar still generates a page. The page shows a setup-needed message with the checked path and the <code>RELEASE_RADAR_HERMES_REPO</code> override instead of failing with a traceback. It still does not run <code>hermes update</code>.</p>
 <h2>Short installation</h2>
 <p>Clone the project:</p>
 <div class="cmd-card"><div class="cmd-top"><span>Command</span><button type="button" onclick="copyCode(this)">Copy</button></div><pre><code>git clone https://github.com/vampyren/Hermes-Release-Radar.git ~/Apps/Hermes-Release-Radar</code></pre></div>
@@ -151,6 +152,10 @@ systemctl --user restart hermes-release-radar.service</code></pre></div>
 <div class="cmd-card"><div class="cmd-top"><span>Command</span><button type="button" onclick="copyCode(this)">Copy</button></div><pre><code>journalctl --user -u hermes-release-radar.service -n 80 --no-pager</code></pre></div>
 <p>Check the helper API:</p>
 <div class="cmd-card"><div class="cmd-top"><span>Command</span><button type="button" onclick="copyCode(this)">Copy</button></div><pre><code>curl -s http://127.0.0.1:8765/api/status</code></pre></div>
+<p>Run the safe smoke test from the repo checkout:</p>
+<div class="cmd-card"><div class="cmd-top"><span>Command</span><button type="button" onclick="copyCode(this)">Copy</button></div><pre><code>cd ~/Apps/Hermes-Release-Radar
+python3 scripts/smoke_test.py</code></pre></div>
+<p>The smoke test checks repo files, Python syntax, a temporary-root generator run, the missing-checkout first-run page, installed runtime files, <code>state.json</code>, and the local helper API when it is running. It does not run <code>hermes update</code>, fetch upstream, restart services, install packages, or mutate the Hermes checkout.</p>
 <p>Refresh upstream data and regenerate the page:</p>
 <div class="cmd-card"><div class="cmd-top"><span>Command</span><button type="button" onclick="copyCode(this)">Copy</button></div><pre><code>curl -s -X POST http://127.0.0.1:8765/api/refresh</code></pre></div>
 <p>Regenerate the page without fetching upstream:</p>
@@ -173,7 +178,8 @@ systemctl --user restart hermes-release-radar.service</code></pre></div>
 <h2>Safety checklist</h2>
 <p>Before publishing or changing the service, verify:</p>
 <ul>
-<li><code>python3 -m py_compile ~/.hermes/release-radar/generate.py ~/.hermes/release-radar/serve.py</code> passes.</li>
+<li><code>python3 scripts/smoke_test.py</code> passes from the repo checkout.</li>
+<li><code>python3 -m py_compile src/generate.py src/serve.py scripts/render_help.py scripts/smoke_test.py</code> passes.</li>
 <li><code>python3 ~/.hermes/release-radar/generate.py</code> regenerates <code>index.html</code>.</li>
 <li><code>systemctl --user status hermes-release-radar.service</code> is healthy.</li>
 <li><code>curl -s <a href="http://127.0.0.1:8765/api/status">http://127.0.0.1:8765/api/status</a></code> returns <code>&quot;ok&quot;: true</code>.</li>

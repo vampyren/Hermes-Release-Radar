@@ -59,16 +59,67 @@ def sh(args: list[str], check: bool = True) -> str:
     return r.stdout.strip()
 
 
+def check_repo_health() -> dict[str, Any]:
+    if not REPO.exists():
+        return {
+            "ok": False,
+            "kind": "missing",
+            "title": "Hermes checkout not found",
+            "message": f"Release Radar expected a Hermes Agent git checkout at {REPO}.",
+        }
+    if not REPO.is_dir():
+        return {
+            "ok": False,
+            "kind": "not_directory",
+            "title": "Hermes checkout path is not a directory",
+            "message": f"{REPO} exists, but it is not a directory.",
+        }
+    r = subprocess.run(["git", "rev-parse", "--is-inside-work-tree"], cwd=str(REPO), text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    if r.returncode != 0 or r.stdout.strip() != "true":
+        return {
+            "ok": False,
+            "kind": "not_git",
+            "title": "Hermes checkout is not a git repo",
+            "message": f"{REPO} exists, but git cannot read it as a worktree. {r.stdout.strip()}",
+        }
+    return {"ok": True, "kind": "ok", "title": "Hermes checkout ready", "message": str(REPO)}
+
+
+def empty_collect(repo_health: dict[str, Any]) -> dict[str, Any]:
+    message = repo_health.get("message") or "Hermes checkout is not available."
+    return {
+        "generated_at": now_iso(),
+        "repo": str(REPO),
+        "repo_ok": False,
+        "repo_problem": repo_health,
+        "version_output": message,
+        "current_version": {"raw": "Hermes checkout unavailable", "version": "not configured", "date": "", "tag": ""},
+        "latest_release": {},
+        "reachable_releases": [],
+        "release_fetch_error": "",
+        "status": message,
+        "head": "",
+        "upstream": "",
+        "behind": 0,
+        "modified": [],
+        "category_counts": {},
+        "importance_counts": {},
+        "category_commits": {},
+        "recent_commits": [],
+    }
+
+
 def load_state() -> dict[str, Any]:
     if STATE_PATH.exists():
         state = json.loads(STATE_PATH.read_text(encoding="utf-8"))
     else:
-        head = sh(["git", "rev-parse", "HEAD"])
+        repo_health = check_repo_health()
+        head = sh(["git", "rev-parse", "HEAD"]) if repo_health.get("ok") else ""
         state = {
             "schema": 2,
             "hermes_repo": str(REPO),
             "baseline_commit": head,
-            "baseline_label": "Initial Release Radar baseline",
+            "baseline_label": "Initial Release Radar baseline" if head else "Waiting for Hermes checkout",
             "review_markers": [],
             "history": [],
         }
@@ -138,6 +189,31 @@ def classify(files: list[str], subject: str):
     return sorted(cats), importance
 
 
+PRIMARY_CATEGORY_ORDER = [
+    "Gateway/platforms",
+    "Dashboard/Web UI",
+    "CLI/TUI",
+    "Kanban/multi-agent",
+    "Core agent/model routing",
+    "Tools/toolsets",
+    "Cron/automation",
+    "Skills",
+    "Install/dependencies",
+    "Docs",
+    "Tests/reliability",
+    "Internal/other",
+]
+
+
+def primary_category(categories: list[str]) -> str:
+    """Pick one display bucket so visible category counts sum to unique commits."""
+    category_set = set(categories)
+    for cat in PRIMARY_CATEGORY_ORDER:
+        if cat in category_set:
+            return cat
+    return categories[0] if categories else "Internal/other"
+
+
 def collect_commits(rev_range: str) -> tuple[list[dict[str, Any]], dict[str, int], dict[str, int], dict[str, list[dict[str, Any]]]]:
     log = sh(["git", "log", "--date=short", "--pretty=format:%H%x1f%h%x1f%ad%x1f%s", "--name-only", rev_range], check=False)
     commits: list[dict[str, Any]] = []
@@ -154,15 +230,16 @@ def collect_commits(rev_range: str) -> tuple[list[dict[str, Any]], dict[str, int
         commits.append(cur)
     for c in commits:
         c["categories"], c["importance"] = classify(c["files"], c["subject"])
+        c["primary_category"] = primary_category(c["categories"])
         c["file_count"] = len(c["files"])
         c["files"] = c["files"][:10]
     cat_counts, imp_counts = Counter(), Counter()
     category_commits: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for c in commits:
         imp_counts[c["importance"]] += 1
-        for cat in c["categories"]:
-            cat_counts[cat] += 1
-            category_commits[cat].append({k: c[k] for k in ["short", "full", "date", "subject", "importance"]})
+        cat = c["primary_category"]
+        cat_counts[cat] += 1
+        category_commits[cat].append({k: c[k] for k in ["short", "full", "date", "subject", "importance", "primary_category"]})
     return commits, dict(cat_counts), dict(imp_counts), dict(category_commits)
 
 
@@ -243,7 +320,10 @@ def releases_between(releases: list[dict[str, Any]], older: str, newer: str) -> 
 
 
 def collect() -> dict[str, Any]:
-    version_output = sh(["hermes", "--version"])
+    repo_health = check_repo_health()
+    if not repo_health.get("ok"):
+        return empty_collect(repo_health)
+    version_output = sh(["hermes", "--version"], check=False) or "Hermes CLI version unavailable"
     status = sh(["git", "status", "--short", "--branch"])
     head = sh(["git", "rev-parse", "HEAD"])
     upstream = sh(["git", "rev-parse", "origin/main"])
@@ -257,6 +337,8 @@ def collect() -> dict[str, Any]:
     return {
         "generated_at": now_iso(),
         "repo": str(REPO),
+        "repo_ok": True,
+        "repo_problem": {},
         "version_output": version_output,
         "current_version": current_version,
         "latest_release": latest_release,
@@ -329,19 +411,20 @@ def build_release_notes(data: dict[str, Any]) -> dict[str, Any]:
         ("Skills and ecosystem", "Skills are easier to discover and extend: optional skill packs, skills hub work, Hugging Face tap support, and new integrations broaden the reusable workflow library.", ["skill", "skills", "notion", "osint", "pinggy", "comfyui", "evm", "huggingface", "skills-hub"], ["Skills", "Docs"], ["New optional skills and better skill discovery/docs.", "Hugging Face skills tap support.", "Notion/OSINT/Pinggy/Darwinian/ComfyUI/EVM-related additions appear in this range."], "Update risk: low. Mostly additive unless you depend on a changed skill.", "neutral"),
         ("Cron and autonomous automation", "Scheduled automation gets practical fixes: better cron lookup, gateway/home-target environment handling, and safer async behavior for background jobs.", ["cron", "job", "schedule", "wakeagent"], ["Cron/automation"], ["Name-based cron job operations.", "Gateway/home-target environment fixes.", "Safer async/thread bridge behavior that can affect background automation."], "Update risk: low-medium. Existing cron jobs should be smoke-tested after update.", "good"),
     ]
-    reachable = data.get("reachable_releases", []) or []
-    official_blob = " ".join(
-        ((r.get("name") or "") + " " + (r.get("body_excerpt") or ""))
-        for r in reachable
-    ).lower()
     for title, why, needles, cats, changes, risk, tone in clusters:
         commits = select_commits(data, needles, cats)
-        official_hit = bool(reachable) and any(n.strip().replace("_", " ") in official_blob for n in needles if n.strip())
-        if commits or official_hit:
-            card_changes = changes if official_hit else commit_subject_changes(commits)
-            notes.append(release_note_card(title, why, card_changes, risk, commits, tone))
+        if not commits:
+            continue
+        # Keep #matters strictly grounded in the current missing range
+        # (HEAD..origin/main). Official release notes may influence which
+        # cluster appears through reachable_release detection elsewhere, but
+        # card bullets/dates/representative commits must come from pending
+        # commits only so the tab answers: what do I not have yet?
+        card_changes = commit_subject_changes(commits)
+        notes.append(release_note_card(title, why, card_changes, risk, commits, tone))
     if not notes:
-        notes.append(release_note_card("No clear user-facing cluster detected", "The commit range mostly looks like internal maintenance from the current heuristics.", ["Raw commits are still listed below for inspection."], "Update risk: unknown; inspect raw commits before updating.", [], "neutral"))
+        fallback_commits = list(data.get("recent_commits", []))[:8]
+        notes.append(release_note_card("No clear user-facing cluster detected", "The commit range mostly looks like internal maintenance from the current heuristics.", commit_subject_changes(fallback_commits), "Update risk: unknown; inspect raw commits before updating.", fallback_commits, "neutral"))
     if behind == 0:
         recommendation = "You are up to date. No update decision needed."
     elif dirty:
@@ -363,6 +446,8 @@ def build_new_since_refresh(state: dict[str, Any], data: dict[str, Any]) -> dict
     the last highlight set so the visible cue does not disappear until the next
     real Refresh from upstream action.
     """
+    if not data.get("repo_ok", True):
+        return {}
     previous = state.get("last_upstream") or ""
     current = data.get("upstream") or ""
     is_refresh = os.environ.get("RELEASE_RADAR_REFRESH") == "1"
@@ -418,7 +503,28 @@ def strip_md(text: str, limit: int = 520) -> str:
     return text[:limit] + ("…" if len(text) > limit else "")
 
 
+def render_first_run_setup(data: dict[str, Any]) -> str:
+    problem = data.get("repo_problem") or {}
+    title = problem.get("title") or "Hermes checkout not ready"
+    message = problem.get("message") or "Release Radar needs a readable Hermes Agent git checkout before it can compare local HEAD with origin/main."
+    return (
+        '<section class="card warn first-run-setup">'
+        f'<h2>{html.escape(title)}</h2>'
+        f'<p>{html.escape(message)}</p>'
+        '<p class="muted">First-run setup: point Release Radar at the Hermes checkout you want to inspect, then regenerate or use the local helper refresh.</p>'
+        '<ol>'
+        '<li>Confirm the Hermes checkout path exists and is a git worktree.</li>'
+        '<li>If Hermes lives elsewhere, set <code>RELEASE_RADAR_HERMES_REPO=/path/to/hermes-agent</code>.</li>'
+        '<li>Run the generator again or start the local helper service. Release Radar still will not run <code>hermes update</code>.</li>'
+        '</ol>'
+        '<pre>RELEASE_RADAR_HERMES_REPO=~/.hermes/hermes-agent\npython3 src/generate.py</pre>'
+        '</section>'
+    )
+
+
 def render_official_release(data: dict[str, Any]) -> str:
+    if not data.get("repo_ok", True):
+        return render_first_run_setup(data)
     latest = data.get("latest_release") or {}
     if data.get("release_fetch_error"):
         return f'<section class="card warn"><h2>Official release notes</h2><p>Could not fetch GitHub release notes: {html.escape(data["release_fetch_error"])}</p></section>'
@@ -454,6 +560,8 @@ def render_official_release(data: dict[str, Any]) -> str:
 
 
 def render_release_notes(data: dict[str, Any]) -> str:
+    if not data.get("repo_ok", True):
+        return render_first_run_setup(data)
     rel = build_release_notes(data)
     cards_html = []
     refresh = data.get("new_since_refresh", {}) or {}
@@ -511,8 +619,12 @@ def render_markers_section(data: dict[str, Any], today_sv: str) -> str:
 def render_page(data: dict[str, Any], state: dict[str, Any]) -> str:
     cats = sorted(data["category_counts"].items(), key=lambda kv: (-kv[1], kv[0]))
     dirty = bool(data["modified"])
-    verdict = "Review first" if data["behind"] else "Up to date"
-    verdict_note = "Local edits" if dirty else ("Ready" if data["behind"] else "Clean")
+    if not data.get("repo_ok", True):
+        verdict = "Setup needed"
+        verdict_note = "Checkout missing"
+    else:
+        verdict = "Review first" if data["behind"] else "Up to date"
+        verdict_note = "Local edits" if dirty else ("Ready" if data["behind"] else "Clean")
     today_sv = datetime.datetime.now().astimezone().strftime("%Y-%m-%d")
     release_notes = render_release_notes(data)
     official = render_official_release(data)
@@ -522,15 +634,16 @@ def render_page(data: dict[str, Any], state: dict[str, Any]) -> str:
 
     def render_cat_jump(cat: str, count: int) -> str:
         is_new = cat in new_cat_counts
-        badge = f"<em class=\"jump-new\">+{new_cat_counts[cat]}</em>" if is_new else ""
+        badge = f"<em class=\"jump-new\" title=\"New primary-category commits this refresh\">+{new_cat_counts[cat]}</em>" if is_new else ""
+        label = "commit" if count == 1 else "commits"
         return (
-            f'<a class="jump{" new-update" if is_new else ""}" href="#{anchor_id("cat", cat)}">'
+            f'<a class="jump{" new-update" if is_new else ""}" href="#{anchor_id("cat", cat)}" title="{count} unique pending {label} in this primary category">'
             f'<span class="jump-label">{html.escape(cat)}</span>'
-            f'<span class="jump-meta"><span class="jump-count">{count}</span>{badge}</span>'
+            f'<span class="jump-meta"><span class="jump-count">{count}</span><span class="jump-unit">{label}</span>{badge}</span>'
             f'</a>'
         )
 
-    cat_nav = "".join(render_cat_jump(cat, count) for cat, count in cats)
+    cat_nav = "".join(render_cat_jump(cat, count) for cat, count in cats) or '<p class="muted">No categories yet. Configure a readable Hermes checkout first.</p>'
 
     def render_category_row(idx: int, e: dict[str, Any]) -> str:
         is_new = e["full"] in new_fulls
@@ -571,7 +684,7 @@ def render_page(data: dict[str, Any], state: dict[str, Any]) -> str:
         f'<button onclick="addMarker(\'Reviewed through {c["short"]}\', \'{c["full"]}\', \'commit-{c["short"]}\')">Mark this commit reviewed</button>'
         f'<ul>' + "".join(f'<li>{html.escape(f)}</li>' for f in c["files"]) + '</ul></details>'
         for c in data["recent_commits"]
-    )
+    ) or '<section class="card"><p class="muted">No raw commits are available until Release Radar can read the Hermes checkout.</p></section>'
     modified = "".join(f"<li><code>{html.escape(m)}</code></li>" for m in data["modified"]) or "<li>None</li>"
     version = data.get("current_version", {})
     latest = data.get("latest_release", {})
@@ -584,7 +697,7 @@ def render_page(data: dict[str, Any], state: dict[str, Any]) -> str:
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,{FAVICON_DATA}">
 <style>
 :root {{ color-scheme: dark; --bg:#0b1014; --panel:#121a21; --text:#e7f0f4; --muted:#91a4af; --accent:#62e6c8; --warn:#ffc857; --bad:#ff6b6b; --line:#26343d; --marker:#62e6c8; }}
-*{{box-sizing:border-box;min-width:0}} html{{scroll-behavior:smooth;overflow-x:hidden}} body{{margin:0;width:100%;max-width:100%;overflow-x:hidden;background:radial-gradient(circle at 15% 0,#18342f 0,#0b1014 34rem);color:var(--text);font:15px/1.45 system-ui,-apple-system,Segoe UI,sans-serif}} main{{width:100%;max-width:1180px;margin:auto;padding:18px;overflow-wrap:anywhere}} h1{{font-size:clamp(24px,6vw,32px);margin:0 0 4px}} h2{{margin:20px 0 9px}} h3{{margin:0}} a{{color:#a8e9ff}} code{{background:#0b1419;border:1px solid var(--line);border-radius:7px;padding:2px 6px;white-space:normal;overflow-wrap:anywhere;word-break:break-word}} pre{{white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word;max-width:100%;overflow-x:auto}} button{{background:#183831;color:var(--text);border:1px solid #2b6d60;border-radius:10px;padding:8px 10px;cursor:pointer;max-width:100%;white-space:normal;text-align:left}} button:hover{{background:#205347}} summary{{cursor:pointer}} details>summary h2{{display:inline;margin-right:10px}} .danger{{background:#3a1b22;border-color:#7d3543}} .status-badge{{display:inline-flex;align-items:center;border-radius:999px;padding:4px 10px;border:1px solid var(--line);font-weight:700}} .status-badge.online{{background:#123a2e;color:#7ff6d7;border-color:#2b8a71}} .status-badge.offline{{background:#3a1b22;color:#ffb3b3;border-color:#7d3543}} .openlink{{display:inline-flex;align-items:center;min-height:34px;padding:0 10px;border:1px solid #315a7e;border-radius:10px;background:#102239;color:#d9ecff;text-decoration:none}} .topbar{{border-bottom:1px solid var(--line);background:#0b1014aa;position:sticky;top:0;z-index:2;backdrop-filter:blur(8px)}} .topbar main{{padding:8px 18px}} .brand{{display:inline-flex;align-items:center;gap:9px;font-weight:800;letter-spacing:.01em;white-space:nowrap;color:var(--text);text-decoration:none}} .brand .app-icon{{width:30px;height:30px;flex:0 0 auto;filter:drop-shadow(0 0 10px #62e6c833)}} .navlinks a{{margin-left:10px;text-decoration:none}} .navlinks .help-icon{{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border:1px solid #315a7e;border-radius:999px;background:#102239;color:#d9ecff;font-weight:900;line-height:1}} .helperbar{{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;background:#0e171d;border:1px solid #21313b;border-radius:14px;padding:10px 12px;margin:0 0 12px;box-shadow:0 8px 20px #0003}} .helperbar p{{margin:2px 0 0}} .helper-actions{{display:flex;gap:8px;flex-wrap:wrap}} .tabs{{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0 8px;position:sticky;top:48px;z-index:1;background:#0b1014cc;padding:8px 0;backdrop-filter:blur(8px)}} .tabbtn{{background:#0e171d;border-color:var(--line);font-weight:800}} .tabbtn.active{{background:#183831;border-color:#2b8a71;color:#dffbf5}} .tab-panel{{display:none}} .tab-panel.active{{display:block}} .summary-strip{{display:grid;grid-template-columns:1.1fr repeat(5,.65fr);gap:8px;margin:8px 0 12px}} .summary-item{{background:#101820;border:1px solid #21313b;border-radius:12px;padding:8px 10px;min-height:56px;display:flex;flex-direction:column;justify-content:center;box-shadow:0 8px 20px #0003}} .summary-label{{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}} .summary-value{{font-size:17px;font-weight:800;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}} .summary-value code{{font-size:15px;padding:1px 5px}} .summary-sub{{font-size:12px;color:#ffc857;margin-top:2px}} @media(max-width:960px){{.summary-strip{{grid-template-columns:repeat(3,1fr)}}}} @media(max-width:560px){{.summary-strip{{grid-template-columns:repeat(2,1fr)}}}} .card,.commit{{background:linear-gradient(180deg,var(--panel),#10171d);border:1px solid var(--line);border-radius:16px;padding:14px;margin:10px 0;box-shadow:0 12px 30px #0005;width:100%;max-width:100%;overflow:hidden}} .muted{{color:var(--muted)}} .row{{display:flex;gap:10px;align-items:center;justify-content:flex-start;flex-wrap:wrap}} .spread{{justify-content:space-between}} .jumpgrid{{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(210px,100%),1fr));gap:8px;align-items:start}} .jump{{display:flex;align-items:center;justify-content:space-between;gap:10px;text-decoration:none;background:#0e171d;border:1px solid var(--line);border-radius:10px;padding:8px 10px;min-height:44px;line-height:1.2}} .jump-label{{font-weight:650;overflow-wrap:normal;word-break:normal;hyphens:none}} .jump-meta{{display:inline-flex;align-items:center;justify-content:flex-end;gap:6px;flex:0 0 auto;white-space:nowrap}} .jump-count{{font-weight:750}} .warn{{border-color:#7a5b20}} .pill{{border-radius:999px;padding:2px 8px;border:1px solid var(--line);font-size:12px}} .pill.high{{background:#3a2b12;color:#ffd98a}} .pill.medium{{background:#1d3042;color:#b9ddff}} .pill.low{{background:#172317;color:#b8f0be}} .marker-controls{{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}} input{{background:#0b1419;color:var(--text);border:1px solid var(--line);border-radius:10px;padding:9px 10px;min-width:min(280px,100%)}} .marker{{display:flex;justify-content:space-between;gap:8px;align-items:center;border:1px solid var(--line);border-radius:12px;padding:8px;margin:7px 0;background:#0e171d}} .section-marker{{display:none}} .section-marker.visible,.inserted-marker{{display:block;margin:12px 0}} .marker-line{{border:0;border-top:2px solid var(--marker)}} .inline-marker-row{{display:flex;gap:8px;justify-content:space-between;align-items:center;flex-wrap:wrap;background:#0c2722;border:1px solid #276e61;border-radius:12px;padding:8px}} .category-card.collapsed .category-commits li.extra,#markers.collapsed .marker.extra{{display:none}} .showmore{{background:#102239;border-color:#315a7e}} .category-commits li,.highlight-list li{{margin:7px 0}} .release-notes,.official-release{{border-color:#315a7e;background:linear-gradient(180deg,#111d27,#0f171d)}} .recommendation{{font-size:17px;font-weight:800;color:#dffbf5}} .release-grid{{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(330px,100%),1fr));gap:12px;align-items:start}} .release-card{{background:#0e171d;border:1px solid var(--line);border-radius:14px;padding:13px;display:flex;flex-direction:column}} .release-card.good{{border-color:#2b6d60}} .release-card.warn{{border-color:#8a6a2d}} .release-card h3{{margin-bottom:8px}} .release-card .why{{color:#dce9ee}} .release-card .risk{{color:#ffd98a;font-weight:650;margin:12px 0 10px}} .commit-ref-block{{margin:8px 0 10px}} .commit-ref-row{{display:flex;gap:4px;flex-wrap:wrap;margin-top:4px}} .card-date{{margin:8px 0 0;padding-top:8px;color:#91a4af;font-size:12px;border-top:1px solid #1f2d35}} .card-date time{{color:#c7d7de}} .new-refresh-banner{{margin:8px 0 10px;padding:8px 10px;border:1px solid #9b7b29;border-radius:12px;background:#211a0b;color:#ffe3a1}} .compact-note{{margin:4px 0 8px}} .new-badge{{display:inline-flex;align-items:center;gap:4px;border:1px solid #9b7b29;border-radius:999px;background:#221907;color:#ffe08a;font-size:12px;font-weight:800;padding:2px 8px;white-space:nowrap}} .release-card.new-update{{border-color:var(--line);box-shadow:none}} .category-card.new-update{{border-color:#c9942e;box-shadow:0 0 0 1px #c9942e66,0 0 22px #c9942e22}} .jump.new-update{{border-color:#c9942e;background:#201707;color:#ffe7a8;font-weight:800}} .jump-new{{font-style:normal;border-radius:999px;background:#3b2a09;color:#ffe08a;border:1px solid #68480b;padding:1px 6px;line-height:1.25;min-width:0}} .category-commits li.new-commit{{background:#201707;border-left:3px solid #c9942e;border-radius:8px;padding:5px 7px}} .new-dot{{display:inline-block;margin-left:6px;border-radius:999px;background:#3b2a09;color:#ffe08a;border:1px solid #9b7b29;font-size:11px;font-weight:800;padding:1px 6px}} .highlight-list{{padding-left:20px}} .version-line{{font-size:16px}}
+*{{box-sizing:border-box;min-width:0}} html{{scroll-behavior:smooth;overflow-x:hidden}} body{{margin:0;width:100%;max-width:100%;overflow-x:hidden;background:radial-gradient(circle at 15% 0,#18342f 0,#0b1014 34rem);color:var(--text);font:15px/1.45 system-ui,-apple-system,Segoe UI,sans-serif}} main{{width:100%;max-width:1180px;margin:auto;padding:18px;overflow-wrap:anywhere}} h1{{font-size:clamp(24px,6vw,32px);margin:0 0 4px}} h2{{margin:20px 0 9px}} h3{{margin:0}} a{{color:#a8e9ff}} code{{background:#0b1419;border:1px solid var(--line);border-radius:7px;padding:2px 6px;white-space:normal;overflow-wrap:anywhere;word-break:break-word}} pre{{white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word;max-width:100%;overflow-x:auto}} button{{background:#183831;color:var(--text);border:1px solid #2b6d60;border-radius:10px;padding:8px 10px;cursor:pointer;max-width:100%;white-space:normal;text-align:left}} button:hover{{background:#205347}} summary{{cursor:pointer}} details>summary h2{{display:inline;margin-right:10px}} .danger{{background:#3a1b22;border-color:#7d3543}} .status-badge{{display:inline-flex;align-items:center;border-radius:999px;padding:4px 10px;border:1px solid var(--line);font-weight:700}} .status-badge.online{{background:#123a2e;color:#7ff6d7;border-color:#2b8a71}} .status-badge.offline{{background:#3a1b22;color:#ffb3b3;border-color:#7d3543}} .openlink{{display:inline-flex;align-items:center;min-height:34px;padding:0 10px;border:1px solid #315a7e;border-radius:10px;background:#102239;color:#d9ecff;text-decoration:none}} .topbar{{border-bottom:1px solid var(--line);background:#0b1014aa;position:sticky;top:0;z-index:2;backdrop-filter:blur(8px)}} .topbar main{{padding:8px 18px}} .brand{{display:inline-flex;align-items:center;gap:9px;font-weight:800;letter-spacing:.01em;white-space:nowrap;color:var(--text);text-decoration:none}} .brand .app-icon{{width:30px;height:30px;flex:0 0 auto;filter:drop-shadow(0 0 10px #62e6c833)}} .navlinks a{{margin-left:10px;text-decoration:none}} .navlinks .help-icon{{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border:1px solid #315a7e;border-radius:999px;background:#102239;color:#d9ecff;font-weight:900;line-height:1}} .helperbar{{display:grid;grid-template-columns:1fr;align-items:start;gap:10px;background:#0e171d;border:1px solid #21313b;border-radius:14px;padding:10px 12px;margin:0 0 12px;box-shadow:0 8px 20px #0003}} .helperbar p{{margin:2px 0 0}} .helper-actions{{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-start;justify-content:flex-start;min-width:0}} .tabs{{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0 8px;position:sticky;top:48px;z-index:1;background:#0b1014cc;padding:8px 0;backdrop-filter:blur(8px)}} .tabbtn{{background:#0e171d;border-color:var(--line);font-weight:800}} .tabbtn.active{{background:#183831;border-color:#2b8a71;color:#dffbf5}} .tab-panel{{display:none}} .tab-panel.active{{display:block}} .summary-strip{{display:grid;grid-template-columns:1.1fr repeat(5,.65fr);gap:8px;margin:8px 0 12px}} .summary-item{{background:#101820;border:1px solid #21313b;border-radius:12px;padding:8px 10px;min-height:56px;display:flex;flex-direction:column;justify-content:center;box-shadow:0 8px 20px #0003}} .summary-label{{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}} .summary-value{{font-size:17px;font-weight:800;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}} .summary-value code{{font-size:15px;padding:1px 5px}} .summary-sub{{font-size:12px;color:#ffc857;margin-top:2px}} @media(max-width:960px){{.summary-strip{{grid-template-columns:repeat(3,1fr)}}}} @media(max-width:560px){{.summary-strip{{grid-template-columns:repeat(2,1fr)}}}} .card,.commit{{background:linear-gradient(180deg,var(--panel),#10171d);border:1px solid var(--line);border-radius:16px;padding:14px;margin:10px 0;box-shadow:0 12px 30px #0005;width:100%;max-width:100%;overflow:hidden}} .muted{{color:var(--muted)}} .row{{display:flex;gap:10px;align-items:center;justify-content:flex-start;flex-wrap:wrap}} .spread{{justify-content:space-between}} .jumpgrid{{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(260px,100%),1fr));gap:10px;align-items:stretch}} .jump{{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:12px;text-decoration:none;background:#0e171d;border:1px solid #24333c;border-radius:12px;padding:10px 12px;min-height:58px;line-height:1.18;color:var(--text)}} .jump-label{{font-weight:750;overflow-wrap:normal;word-break:normal;hyphens:none}} .jump-meta{{display:inline-flex;align-items:center;justify-content:flex-end;gap:6px;flex-wrap:nowrap;white-space:nowrap}} .jump-count{{font-weight:800;color:#dceff4}} .jump-unit{{font-size:11px;color:var(--muted)}} .warn{{border-color:#7a5b20}} .pill{{border-radius:999px;padding:2px 8px;border:1px solid var(--line);font-size:12px}} .pill.high{{background:#3a2b12;color:#ffd98a}} .pill.medium{{background:#1d3042;color:#b9ddff}} .pill.low{{background:#172317;color:#b8f0be}} .marker-controls{{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}} input{{background:#0b1419;color:var(--text);border:1px solid var(--line);border-radius:10px;padding:9px 10px;min-width:min(280px,100%)}} .marker{{display:flex;justify-content:space-between;gap:8px;align-items:center;border:1px solid var(--line);border-radius:12px;padding:8px;margin:7px 0;background:#0e171d}} .section-marker{{display:none}} .section-marker.visible,.inserted-marker{{display:block;margin:12px 0}} .marker-line{{border:0;border-top:2px solid var(--marker)}} .inline-marker-row{{display:flex;gap:8px;justify-content:space-between;align-items:center;flex-wrap:wrap;background:#0c2722;border:1px solid #276e61;border-radius:12px;padding:8px}} .category-card.collapsed .category-commits li.extra,#markers.collapsed .marker.extra{{display:none}} .showmore{{background:#102239;border-color:#315a7e}} .category-commits li,.highlight-list li{{margin:7px 0}} .release-notes,.official-release{{border-color:#315a7e;background:linear-gradient(180deg,#111d27,#0f171d)}} .recommendation{{font-size:17px;font-weight:800;color:#dffbf5}} .release-grid{{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(330px,100%),1fr));gap:12px;align-items:start}} .release-card{{background:#0e171d;border:1px solid var(--line);border-radius:14px;padding:13px;display:flex;flex-direction:column}} .release-card.good{{border-color:#2b6d60}} .release-card.warn{{border-color:#8a6a2d}} .release-card h3{{margin-bottom:8px}} .release-card .why{{color:#dce9ee}} .release-card .risk{{color:#ffd98a;font-weight:650;margin:12px 0 10px}} .commit-ref-block{{margin:8px 0 10px}} .commit-ref-row{{display:flex;gap:4px;flex-wrap:wrap;margin-top:4px}} .card-date{{margin:8px 0 0;padding-top:8px;color:#91a4af;font-size:12px;border-top:1px solid #1f2d35}} .card-date time{{color:#c7d7de}} .new-refresh-banner{{margin:8px 0 10px;padding:8px 10px;border:1px solid #9b7b29;border-radius:12px;background:#211a0b;color:#ffe3a1}} .compact-note{{margin:4px 0 8px}} .new-badge{{display:inline-flex;align-items:center;gap:4px;border:1px solid #2f7180;border-radius:999px;background:#102832;color:#bfeef5;font-size:12px;font-weight:650;padding:2px 8px;white-space:nowrap}} .release-card.new-update{{border-color:var(--line);box-shadow:none}} .category-card.new-update{{border-color:#2f7180;box-shadow:none}} .jump.new-update{{border-color:#2f7180;background:linear-gradient(180deg,#102832,#0e171d);color:var(--text);font-weight:inherit;box-shadow:inset 3px 0 0 #38b6c9}} .jump-new{{font-style:normal;border-radius:999px;background:#3a1f25;color:#ffc6cc;border:1px solid #b85b68;padding:2px 7px;line-height:1.25;min-width:0;font-size:12px;font-weight:650}} .category-commits li.new-commit{{background:#102832;border-left:3px solid #38b6c9;border-radius:8px;padding:5px 7px}} .new-dot{{display:inline-block;margin-left:6px;border-radius:999px;background:#3a1f25;color:#ffc6cc;border:1px solid #b85b68;font-size:11px;font-weight:650;padding:1px 6px}} .highlight-list{{padding-left:20px}} .version-line{{font-size:16px}} @media(max-width:760px){{.helperbar{{grid-template-columns:1fr}} .helper-actions{{justify-content:flex-start;min-width:0}}}}
 </style></head><body>
 <div id="top" class="topbar"><main class="row spread"><a class="brand" href="index.html" aria-label="Hermes Release Radar home">{APP_ICON_SVG}<span>Hermes Release Radar</span></a><span class="navlinks"><a href="index.html">Current</a><a href="history.html">History ({history_count})</a><a class="help-icon" href="help.html" title="Help / setup commands" aria-label="Help / setup commands">?</a></span></main></div>
 <main>
@@ -602,7 +715,7 @@ def render_page(data: dict[str, Any], state: dict[str, Any]) -> str:
 <section id="tab-official" class="tab-panel active">{official}</section>
 <section id="tab-matters" class="tab-panel">{release_notes}</section>
 <section id="tab-raw" class="tab-panel">
-<section class="card"><h2>Jump to category</h2><p class="muted">Raw commit groups are here for auditability. The tabs above keep the page lean without hiding the data.</p><div class="jumpgrid">{cat_nav}</div></section>
+<section class="card"><h2>Jump to category</h2><p class="muted">Raw commit groups are here for auditability. <b>{data['behind']}</b> unique pending commit(s) are in the current <code>HEAD..origin/main</code> range. Category numbers below use each commit’s primary category, so the visible category total matches the unique pending count.</p><div class="jumpgrid">{cat_nav}</div></section>
 <section class="card warn"><h2>Update safety note</h2><p>This page only inspected git/release data. It did not install, update, restart, reset, stash, or modify Hermes source.</p><p>Local modified files detected:</p><ul>{modified}</ul></section>
 {render_markers_section(data, today_sv)}
 <section class="card"><h2>Current installed state</h2><pre>{html.escape(data['version_output'])}\n{html.escape(data['status'])}</pre><p>Baseline checkpoint: <code>{html.escape(state.get('baseline_commit','')[:12])}</code> — {html.escape(state.get('baseline_label',''))}</p></section>
@@ -636,12 +749,13 @@ function useTodayLabel() {{ const input = document.getElementById('markerLabel')
 function markAllCategories() {{ const input = document.getElementById('markerLabel'); const labelText = (input && input.value.trim()) || TODAY_LABEL; const suffix = labelText ? ` — ${{labelText}}` : ''; const existing = getMarkers().filter(m => !CATEGORY_TARGETS.some(c => c.id === (m.target_id || 'top'))); const now = new Date().toISOString(); const added = CATEGORY_TARGETS.map(c => ({{ id: (crypto.randomUUID ? crypto.randomUUID() : `${{Date.now()}}-${{c.id}}`), label: `${{c.label}} reviewed${{suffix}}`, commit: c.commit, target_id: c.id, created_at: now }})); if (input) input.value = ''; saveMarkers([...added, ...existing]); }}
 function deleteMarker(id) {{ saveMarkers(getMarkers().filter(m => m.id !== id)); }}
 function clearMarkers() {{ if (confirm('Clear all review markers for this page?')) saveMarkers([]); }}
-async function refreshRadar() {{ try {{ setHelperStatus(true, 'Refreshing: git fetch origin --quiet + regenerate page…'); const activeHash = location.hash || '#official'; const res = await fetch(`${{HELPER}}/api/refresh`, {{method:'POST'}}); const payload = await res.json().catch(() => ({{}})); if (!res.ok || !payload.ok) throw new Error(payload.error || await res.text()); location.href = `${{HELPER}}/?t=${{Date.now()}}${{activeHash}}`; }} catch (err) {{ setHelperStatus(false, `Refresh failed or helper is offline: ${{err.message || err}}`); alert('Refresh needs the local helper service: hermes-release-radar.service'); }} }}
+function activeTabHash() {{ const active = document.querySelector('.tab-panel.active'); if (!active || !active.id) return '#official'; return `#${{active.id.replace('tab-', '')}}`; }}
+async function refreshRadar() {{ try {{ const activeHash = activeTabHash(); setHelperStatus(true, 'Refreshing: git fetch origin --quiet + regenerate page…'); const res = await fetch(`${{HELPER}}/api/refresh`, {{method:'POST'}}); const payload = await res.json().catch(() => ({{}})); if (!res.ok || !payload.ok) throw new Error(payload.error || await res.text()); location.href = `${{HELPER}}/?t=${{Date.now()}}${{activeHash}}`; }} catch (err) {{ setHelperStatus(false, `Refresh failed or helper is offline: ${{err.message || err}}`); alert('Refresh needs the local helper service: hermes-release-radar.service'); }} }}
 function toggleCategory(id) {{ const section = document.getElementById(id); if (!section) return; section.classList.toggle('collapsed'); const btn = section.querySelector('.showmore'); if (btn) btn.textContent = section.classList.contains('collapsed') ? btn.dataset.showLabel : btn.dataset.hideLabel; }}
 function toggleBlock(id, btn) {{ const el = document.getElementById(id); if (!el) return; el.classList.toggle('collapsed'); if (btn && btn.dataset) btn.textContent = el.classList.contains('collapsed') ? btn.dataset.showLabel : btn.dataset.hideLabel; }}
 function toggleMarkerList(btn) {{ const el = document.getElementById('markers'); if (!el) return; el.classList.toggle('collapsed'); if (btn && btn.dataset) btn.textContent = el.classList.contains('collapsed') ? btn.dataset.showLabel : btn.dataset.hideLabel; }}
 function switchTab(name, btn) {{ document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === `tab-${{name}}`)); document.querySelectorAll('.tabbtn').forEach(b => b.classList.toggle('active', b === btn)); if (history.replaceState) history.replaceState(null, '', `#${{name}}`); }}
-function activateInitialTab() {{ const name = (location.hash || '#official').slice(1); const btn = [...document.querySelectorAll('.tabbtn')].find(b => b.getAttribute('onclick')?.includes(`'${{name}}'`)); if (btn) switchTab(name, btn); }}
+function activateInitialTab() {{ let name = (location.hash || '#official').slice(1); if (name.startsWith('cat-') || name.startsWith('commit-')) name = 'raw'; const btn = [...document.querySelectorAll('.tabbtn')].find(b => b.getAttribute('onclick')?.includes(`'${{name}}'`)); if (btn) switchTab(name, btn); }}
 function renderMarkers() {{ const el = document.getElementById('markers'); const ns = document.getElementById('newSince'); const ms = getMarkers(); document.querySelectorAll('[data-marker-slot]').forEach(slot => {{ slot.classList.remove('visible'); slot.innerHTML = ''; }}); document.querySelectorAll('.inserted-marker').forEach(node => node.remove()); if (!ms.length) {{ if(el) el.innerHTML = '<p class="muted">No review markers yet.</p>'; if(ns) ns.textContent = 'Everything above your first marker will count as new to your eyes.'; return; }} const latestByTarget = new Map(); ms.slice().reverse().forEach(m => latestByTarget.set(m.target_id || 'top', m)); latestByTarget.forEach((m, targetId) => {{ const section = document.getElementById(targetId); const markHtml = `<div class="section-marker visible inserted-marker"><hr class="marker-line"><div class="inline-marker-row"><span class="marker-label">Reviewed through here: ${{escapeHtml(m.label)}} · ${{new Date(m.created_at).toLocaleString()}}</span><button class="danger" onclick="deleteMarker('${{m.id}}')">Clear marker</button></div></div>`; if (section && section.classList.contains('category-card')) {{ const match = section.querySelector(`li[data-commit="${{cssEscape(m.commit || '')}}"]`); if (match) match.insertAdjacentHTML('beforebegin', markHtml); else {{ const slot = section.querySelector(`[data-marker-slot="${{cssEscape(targetId)}}"]`); if (slot) {{ slot.classList.add('visible'); slot.innerHTML = markHtml; }} }} return; }} const slot = document.querySelector(`[data-marker-slot="${{cssEscape(targetId)}}"]`); if (slot) {{ slot.classList.add('visible'); slot.innerHTML = markHtml; }} }}); if(el) {{ const rows = ms.map((m,i) => `<div class="marker ${{i >= 4 ? 'extra' : ''}}"><div><b>${{escapeHtml(m.label)}}</b><br><span class="muted">${{new Date(m.created_at).toLocaleString()}} · <code>${{(m.commit || 'unknown').slice(0,12)}}</code> · <a class="backtop" href="#${{escapeHtml(m.target_id || 'top')}}">jump</a></span></div><button class="danger" onclick="deleteMarker('${{m.id}}')">Clear marker</button></div>`).join(''); const btn = ms.length > 4 ? `<button class="showmore" onclick="toggleMarkerList(this)" data-show-label="Show all ${{ms.length}} markers" data-hide-label="Show fewer markers">Show all ${{ms.length}} markers</button>` : ''; el.classList.add('collapsed'); el.innerHTML = rows + btn; }} if(ns) ns.innerHTML = `Last review marker: <code>${{(ms[0].commit || 'unknown').slice(0,12)}}</code>. Newer upstream top now: <code>${{(STATE.upstream || 'unknown').slice(0,12)}}</code>.`; }}
 function cssEscape(s) {{ return String(s).replace(/[^a-zA-Z0-9_-]/g, ''); }}
 function escapeHtml(s) {{ return String(s).replace(/[&<>"']/g, c => ({{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}}[c])); }}
@@ -667,6 +781,8 @@ def render_history(state: dict[str, Any]) -> str:
 
 
 def archive_if_head_advanced(state: dict[str, Any], data: dict[str, Any]) -> None:
+    if not data.get("repo_ok", True):
+        return
     baseline = state.get("baseline_commit") or ""
     head = data["head"]
     if not baseline:
@@ -712,8 +828,8 @@ def main():
     state["last_generated_at"] = data["generated_at"]
     state["last_refresh_highlights"] = data.get("new_since_refresh", {})
     state["last_version_output"] = data.get("version_output", "")
-    state["last_head"] = data["head"]
-    state["last_upstream"] = data["upstream"]
+    state["last_head"] = data.get("head", "")
+    state["last_upstream"] = data.get("upstream", "")
     state["hermes_repo"] = str(REPO)
     save_state(state)
     stamp = data["generated_at"].replace(":", "").replace("+", "_")
