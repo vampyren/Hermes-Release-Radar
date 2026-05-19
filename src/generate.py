@@ -12,12 +12,13 @@ import json
 import os
 import re
 import subprocess
-import tempfile
 import urllib.parse
 import urllib.request
 from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Any
+
+from state import load_state_file, save_state_file
 
 def env_path(name: str, default: Path) -> Path:
     value = os.environ.get(name)
@@ -136,30 +137,11 @@ def default_state() -> dict[str, Any]:
 
 
 def load_state() -> dict[str, Any]:
-    if STATE_PATH.exists():
-        try:
-            state = json.loads(STATE_PATH.read_text(encoding="utf-8"))
-        except json.JSONDecodeError:
-            backup = STATE_PATH.with_suffix(".json.corrupt")
-            STATE_PATH.replace(backup)
-            state = default_state()
-            state["state_warning"] = f"Previous state.json was corrupt and moved to {backup}"
-    else:
-        state = default_state()
-    state.setdefault("schema", 2)
-    state.setdefault("review_markers", [])
-    state.setdefault("history", [])
-    return state
+    return load_state_file(STATE_PATH, REPO, default_state)
 
 
 def save_state(state: dict[str, Any]) -> None:
-    state["schema"] = max(int(state.get("schema", 1)), 2)
-    state["hermes_repo"] = str(REPO)
-    STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
-    with tempfile.NamedTemporaryFile("w", encoding="utf-8", dir=STATE_PATH.parent, prefix=f"{STATE_PATH.name}.", suffix=".tmp", delete=False) as fh:
-        tmp = Path(fh.name)
-        json.dump(state, fh, indent=2, ensure_ascii=False)
-    os.replace(tmp, STATE_PATH)
+    save_state_file(STATE_PATH, REPO, state)
 
 
 def parse_version(text: str) -> dict[str, str]:
@@ -174,7 +156,7 @@ def parse_version(text: str) -> dict[str, str]:
 def is_ancestor(older: str, newer: str) -> bool:
     if not older or not newer:
         return False
-    r = subprocess.run(["git", "merge-base", "--is-ancestor", older, newer], cwd=str(REPO))
+    r = subprocess.run(["git", "merge-base", "--is-ancestor", older, newer], cwd=str(REPO), timeout=60)
     return r.returncode == 0
 
 

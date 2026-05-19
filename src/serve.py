@@ -17,9 +17,11 @@ import http.server
 import ipaddress
 import json
 import os
+import re
 import subprocess
-import tempfile
 from pathlib import Path
+
+from state import load_state_file, save_state_file
 
 ROOT = Path(os.environ.get("RELEASE_RADAR_ROOT", Path.home() / ".hermes" / "release-radar")).expanduser()
 REPO = Path(os.environ.get("RELEASE_RADAR_HERMES_REPO", Path.home() / ".hermes" / "hermes-agent")).expanduser()
@@ -28,6 +30,11 @@ STATE_PATH = ROOT / "state.json"
 HOST = os.environ.get("RELEASE_RADAR_HOST", "127.0.0.1")
 LOCAL_HOSTS = {"127.0.0.1", "localhost", "::1"}
 ALLOWED_STATIC = {"/", "/index.html", "/history.html", "/help.html"}
+MAX_JSON_BODY_BYTES = 64 * 1024
+MAX_REVIEW_MARKERS = 500
+MAX_MARKER_FIELD_CHARS = 512
+COMMIT_RE = re.compile(r"^[0-9a-fA-F]{7,64}$")
+TARGET_RE = re.compile(r"^[A-Za-z0-9_.:-]{1,160}$")
 try:
     PORT = int(os.environ.get("RELEASE_RADAR_PORT", "8765"))
 except ValueError as exc:
@@ -35,32 +42,50 @@ except ValueError as exc:
 
 
 def load_state() -> dict:
-    if not STATE_PATH.exists():
-        return {"schema": 2, "hermes_repo": str(REPO), "review_markers": []}
-    try:
-        state = json.loads(STATE_PATH.read_text(encoding="utf-8"))
-    except json.JSONDecodeError:
-        backup = STATE_PATH.with_suffix(".json.corrupt")
-        STATE_PATH.replace(backup)
-        return {
-            "schema": 2,
-            "hermes_repo": str(REPO),
-            "review_markers": [],
-            "state_warning": f"Previous state.json was corrupt and moved to {backup}",
-        }
-    state.setdefault("schema", 2)
-    state.setdefault("review_markers", [])
-    return state
+    return load_state_file(STATE_PATH, REPO, default_state)
+
+
+def default_state() -> dict:
+    return {
+        "schema": 2,
+        "hermes_repo": str(REPO),
+        "baseline_commit": "",
+        "baseline_label": "Waiting for Hermes checkout",
+        "review_markers": [],
+        "history": [],
+    }
 
 
 def save_state(state: dict) -> None:
-    state["schema"] = max(int(state.get("schema", 1)), 2)
-    state["hermes_repo"] = str(REPO)
-    STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
-    with tempfile.NamedTemporaryFile("w", encoding="utf-8", dir=STATE_PATH.parent, prefix=f"{STATE_PATH.name}.", suffix=".tmp", delete=False) as fh:
-        tmp = Path(fh.name)
-        json.dump(state, fh, indent=2, ensure_ascii=False)
-    os.replace(tmp, STATE_PATH)
+    save_state_file(STATE_PATH, REPO, state)
+
+
+def validate_markers(markers: object) -> list[dict]:
+    if not isinstance(markers, list):
+        raise ValueError("review_markers must be a list")
+    if len(markers) > MAX_REVIEW_MARKERS:
+        raise ValueError(f"review_markers must contain at most {MAX_REVIEW_MARKERS} entries")
+    cleaned: list[dict] = []
+    for index, marker in enumerate(markers):
+        if not isinstance(marker, dict):
+            raise ValueError(f"review_markers[{index}] must be an object")
+        cleaned_marker: dict[str, str] = {}
+        for key in ("id", "label", "commit", "target_id", "created_at"):
+            value = marker.get(key, "")
+            if value is None:
+                value = ""
+            if not isinstance(value, str):
+                raise ValueError(f"review_markers[{index}].{key} must be a string")
+            value = value.strip()
+            if len(value) > MAX_MARKER_FIELD_CHARS:
+                raise ValueError(f"review_markers[{index}].{key} is too long")
+            cleaned_marker[key] = value
+        if cleaned_marker["commit"] and not COMMIT_RE.match(cleaned_marker["commit"]):
+            raise ValueError(f"review_markers[{index}].commit must be a git commit hash")
+        if cleaned_marker["target_id"] and not TARGET_RE.match(cleaned_marker["target_id"]):
+            raise ValueError(f"review_markers[{index}].target_id contains invalid characters")
+        cleaned.append(cleaned_marker)
+    return cleaned
 
 
 def regenerate(refresh: bool = False) -> str:
@@ -132,8 +157,14 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         length = int(self.headers.get("Content-Length", "0") or "0")
         if length <= 0:
             return {}
+        if length > MAX_JSON_BODY_BYTES:
+            raise ValueError(f"JSON body is too large; limit is {MAX_JSON_BODY_BYTES} bytes")
         raw = self.rfile.read(length).decode("utf-8")
         return json.loads(raw or "{}")
+
+    def list_directory(self, path):
+        self.send_error(404, "Directory listing is disabled")
+        return None
 
     def do_OPTIONS(self):
         return self._json(403, {"ok": False, "error": "CORS preflight is not supported; use the local helper page"})
@@ -153,6 +184,8 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 "marker_count": len(state.get("review_markers", [])),
             })
         if self.path == "/api/state":
+            if not self._is_local_request():
+                return self._json(403, {"ok": False, "error": "local requests only"})
             return self._json(200, {"ok": True, "state": load_state()})
         if not self._is_allowed_static():
             return self._json(404, {"ok": False, "error": "not found"})
@@ -183,14 +216,14 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         if self.path == "/api/markers":
             try:
                 payload = self._read_json_body()
-                markers = payload.get("review_markers")
-                if not isinstance(markers, list):
-                    return self._json(400, {"ok": False, "error": "review_markers must be a list"})
+                markers = validate_markers(payload.get("review_markers"))
                 state = load_state()
                 state["review_markers"] = markers
                 save_state(state)
                 output = regenerate()
                 return self._json(200, {"ok": True, "message": "Markers saved", "output": output})
+            except ValueError as e:
+                return self._json(400, {"ok": False, "error": str(e)})
             except Exception as e:
                 return self._json(500, {"ok": False, "error": str(e)})
 

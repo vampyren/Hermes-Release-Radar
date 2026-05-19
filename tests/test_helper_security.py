@@ -27,11 +27,12 @@ def free_port() -> int:
 
 
 class HelperServer:
-    def __init__(self) -> None:
+    def __init__(self, *, create_index: bool = True) -> None:
         self.tmp = tempfile.TemporaryDirectory(prefix="release-radar-helper-test-")
         self.root = Path(self.tmp.name)
         self.port = free_port()
-        (self.root / "index.html").write_text("index", encoding="utf-8")
+        if create_index:
+            (self.root / "index.html").write_text("index", encoding="utf-8")
         (self.root / "history.html").write_text("history", encoding="utf-8")
         (self.root / "help.html").write_text("help", encoding="utf-8")
         (self.root / "state.json").write_text(json.dumps({"schema": 2, "review_markers": []}), encoding="utf-8")
@@ -111,6 +112,23 @@ class HelperSecurityTests(unittest.TestCase):
                 ctx.exception.close()
                 self.assertEqual(ctx.exception.code, 404)
 
+    def test_directory_listing_is_disabled_before_first_generation(self) -> None:
+        server = HelperServer(create_index=False)
+        try:
+            with self.assertRaises(HTTPError) as ctx:
+                urlopen(f"http://127.0.0.1:{server.port}/", timeout=5)
+            ctx.exception.close()
+            self.assertEqual(ctx.exception.code, 404)
+        finally:
+            server.close()
+
+    def test_api_state_rejects_hostile_origin(self) -> None:
+        req = Request(self.base + "/api/state", headers={"Origin": "https://evil.example"})
+        with self.assertRaises(HTTPError) as ctx:
+            urlopen(req, timeout=5)
+        ctx.exception.close()
+        self.assertEqual(ctx.exception.code, 403)
+
     def test_state_changing_posts_reject_non_local_host(self) -> None:
         conn = http.client.HTTPConnection("127.0.0.1", self.server.port, timeout=5)
         body = json.dumps({"review_markers": []})
@@ -123,6 +141,33 @@ class HelperSecurityTests(unittest.TestCase):
         payload = response.read().decode("utf-8")
         conn.close()
         self.assertEqual(response.status, 403, payload)
+
+    def test_marker_body_size_is_capped(self) -> None:
+        conn = http.client.HTTPConnection("127.0.0.1", self.server.port, timeout=5)
+        conn.putrequest("POST", "/api/markers", skip_host=True)
+        conn.putheader("Host", f"127.0.0.1:{self.server.port}")
+        conn.putheader("Content-Type", "application/json")
+        conn.putheader("Content-Length", str(serve.MAX_JSON_BODY_BYTES + 1))
+        conn.endheaders()
+        response = conn.getresponse()
+        payload = response.read().decode("utf-8")
+        conn.close()
+        self.assertEqual(response.status, 400, payload)
+        self.assertIn("too large", payload)
+
+    def test_marker_validation_rejects_malformed_marker(self) -> None:
+        conn = http.client.HTTPConnection("127.0.0.1", self.server.port, timeout=5)
+        body = json.dumps({"review_markers": [{"id": "one", "commit": "not-a-hash", "target_id": "cat-Test"}]})
+        conn.putrequest("POST", "/api/markers", skip_host=True)
+        conn.putheader("Host", f"127.0.0.1:{self.server.port}")
+        conn.putheader("Content-Type", "application/json")
+        conn.putheader("Content-Length", str(len(body)))
+        conn.endheaders(body.encode("utf-8"))
+        response = conn.getresponse()
+        payload = response.read().decode("utf-8")
+        conn.close()
+        self.assertEqual(response.status, 400, payload)
+        self.assertIn("commit", payload)
 
     def test_local_request_guard_checks_peer_address(self) -> None:
         fake = serve.Handler.__new__(serve.Handler)

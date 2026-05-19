@@ -100,6 +100,7 @@ def check_python_compile(report: Reporter, repo_root: Path) -> None:
     files = [
         repo_root / "src/generate.py",
         repo_root / "src/serve.py",
+        repo_root / "src/state.py",
         repo_root / "scripts/render_help.py",
         repo_root / "scripts/smoke_test.py",
         repo_root / "tests/test_helper_security.py",
@@ -296,7 +297,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--runtime-root", type=Path, default=env_path("RELEASE_RADAR_ROOT", Path.home() / ".hermes" / "release-radar"))
     parser.add_argument("--host", default=os.environ.get("RELEASE_RADAR_HOST", "127.0.0.1"))
     parser.add_argument("--port", type=int, default=int(os.environ.get("RELEASE_RADAR_PORT", "8765")))
-    parser.add_argument("--skip-helper", action="store_true", help="Do not call the local helper API.")
+    parser.add_argument("--skip-helper", action="store_true", help="Do not call the installed local helper API. Security regression tests still start an ephemeral loopback helper.")
     return parser.parse_args()
 
 
