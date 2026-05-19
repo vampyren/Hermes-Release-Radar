@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+No unreleased changes.
+
+## 0.4.1-local - 2026-05-19
+
 - Added `scripts/smoke_test.py` for safe one-command health verification of repo files, Python syntax, temporary-root generation, installed runtime state, and local helper API status.
 - Added smoke-test guards for the core generated UI contracts: helper controls below status text, range-correct primary-category counts, active-tab preservation, and pending-range `#matters` cards.
 - Fixed `Refresh from upstream` tab preservation by reloading to the active tab hash and mapping raw category/commit anchors back to the Raw tab.
@@ -16,6 +20,8 @@
 - Added graceful first-run handling when the configured Hermes checkout is missing or not a git worktree, including setup guidance in the generated page.
 - Added a smoke-test guard for the missing-checkout first-run page.
 - Documented smoke-test usage in README and operator help.
+- Added explicit design-language documentation in README and architecture docs for the dark teal/navy palette, muted text, compact sizing, helper layout, range-correct category cards, and restrained refresh badges.
+- Aligned the generated history page and rendered help page with the same muted blue-gray primary text used by the current page.
 
 ## 0.4.0-local - 2026-05-17
 

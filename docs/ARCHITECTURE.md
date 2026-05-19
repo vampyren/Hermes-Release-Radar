@@ -49,13 +49,49 @@ A separate public GitHub Pages generator and rebuild workflow were intentionally
 
 ## UI design choices
 
-- Dark, calm theme.
-- Three main tabs: Official release notes, What actually matters, Raw categorized commits.
-- `#matters` cards stay calm; freshness is shown with compact pills instead of bright card borders.
-- Representative commits render as wrapped chips.
-- Representative commit dates show the commit date range represented by a card.
+Release Radar uses a compact dark-teal operational design language. Keep every generated page calm, readable, and local-tool-like rather than marketing-glossy.
+
+### Core layout
+
+- Three main current-page tabs: Official release notes, What actually matters, Raw categorized commits.
+- Keep the local helper status text and long path details on their own row. Helper actions belong below that text, left-aligned and wrapped, so paths never compete with buttons or cause layout shift.
+- Use compact cards with rounded corners, subtle borders, and restrained shadows. Avoid large padded hero blocks.
+- Keep mobile safe: no horizontal overflow, `min-width:0` on grid/flex children, wrapped paths/code, and auto-fit grids that collapse to one column.
+- `#matters` and Raw overview boxes should share the same understated container treatment; do not add a heavy left-edge accent to overview containers.
+
+### Color and contrast
+
+- Page background: near-black navy `#0b1014` with a soft dark-teal radial accent (`#18342f`) near the top-left.
+- Panel/card surfaces: `#121a21`, `#101820`, or gradients around `#101c24` → `#0d151b`.
+- Primary text: muted blue-gray `#c7d7dc`, not near-white. Muted text: `#91a4af`.
+- Accent/callout color: cyan-teal `#62e6c8`; links may use soft cyan such as `#a8e9ff`.
+- Borders: dark blue-gray `#26343d`; active/update edges may use subtle green/teal such as `#2b6d60` or `#2b8f78`.
+- Avoid harsh yellow/brown boxes, bright yellow borders, or glowing warning panels. Yellow may appear only as a small medium-signal text accent when needed.
+- Error/offline/danger states may use muted reds (`#3a1b22`, `#7d3543`, `#ffb3b3`) but should not dominate the page.
+
+### Typography and sizing
+
+- Base font: system UI stack at about `15px/1.45`.
+- Main heading: responsive `clamp(24px, 6vw, 32px)`.
+- Signal labels: small uppercase text around `11px`, letter-spaced, font weight around `650`.
+- Buttons: compact `8px 10px` padding, rounded `10px`, readable but not oversized.
+- Category jump tiles: minimum width around `260px`, normal height around `58px`, with the label kept readable and counts aligned to the right.
+- Refresh/change pills: small, round, about `12px`, moderate weight around `650`; avoid fat `800+` weights and avoid text/glow shadows.
+
+### Refresh and category language
+
+- Category and `#matters` refresh deltas use small muted reddish `+N` pills (`#3a1f25` background, rose text/border) while keeping the tile/card edge cyan-teal. Do not use big `new upstream commits` banners.
+- Raw and `#matters` category counts must use one primary category per pending commit, so visible category totals add up to the unique `HEAD..origin/main` count.
+- `#matters` cards mirror Raw categories, show signal labels (`Critical`, `Medium`, `Low`) with small dots, and deep-link to matching Raw sections.
+- `#matters` cards must stay range-correct: cards and representative commits come from the current missing range, not broad historical releases or arbitrary date windows.
+- Representative commits render as a label line followed by wrapped chips. Representative commit dates show the commit date range represented by a card.
+- Secondary explanatory copy belongs behind `<details>`/`<summary>` controls to preserve vertical density.
+
+### Help and history pages
+
 - Help page command blocks use one clean command panel, not nested inline-code boxes.
 - Help command blocks include copy buttons and line-continuation wrapping for long paths.
+- History/help/current pages should reuse the same dark navy/teal palette, muted primary text, soft cyan links, and app-brand treatment unless a page has a deliberate reason to differ.
 
 ## Safety boundaries
 

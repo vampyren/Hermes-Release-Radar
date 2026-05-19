@@ -4,7 +4,7 @@ Hermes Release Radar is a local, safe update-intelligence page for Hermes Agent.
 
 It answers: what changed upstream since the Hermes checkout I am running now, and what actually matters?
 
-Published project version: `0.4.0-local`.
+Published project version: `0.4.1-local`.
 
 ## Local URL
 
@@ -60,6 +60,22 @@ Human-readable impact cards summarize the important change clusters first, with 
 The raw view keeps the full commit trail grouped by category, with review markers and safety notes available in the same page.
 
 ![Raw categorized commits view](docs/assets/screenshots/raw-categorized-commits.png)
+
+## Design language
+
+Release Radar uses a compact dark-teal operational UI language:
+
+- Dark navy base (`#0b1014`) with soft teal accents, not harsh yellow/brown panels.
+- Muted blue-gray primary text (`#c7d7dc`) and muted secondary text (`#91a4af`) to avoid near-white glare.
+- Cyan-teal accents (`#62e6c8`) and soft cyan links (`#a8e9ff`) for affordances.
+- Rounded compact cards, subtle borders/shadows, and no large padded marketing-style hero blocks.
+- Helper controls sit below helper status/path text to avoid layout shifts.
+- Raw and `What actually matters` category counts are range-correct and use one primary category per pending commit.
+- Refresh deltas use small muted reddish `+N` pills with moderate weight, no glow, and no oversized banners.
+- `What actually matters` cards mirror Raw categories, use `Critical`/`Medium`/`Low` signal labels, and deep-link to Raw sections.
+- Secondary explanatory copy is collapsed behind `<details>` controls where practical.
+
+See `docs/ARCHITECTURE.md` for the fuller color, text, sizing, and component rules that should stay consistent across current, history, and help pages.
 
 ## Safety contract
 
