@@ -97,7 +97,14 @@ def check_repo_files(report: Reporter, repo_root: Path) -> None:
 
 
 def check_python_compile(report: Reporter, repo_root: Path) -> None:
-    files = [repo_root / "src/generate.py", repo_root / "src/serve.py", repo_root / "scripts/render_help.py", repo_root / "scripts/smoke_test.py"]
+    files = [
+        repo_root / "src/generate.py",
+        repo_root / "src/serve.py",
+        repo_root / "scripts/render_help.py",
+        repo_root / "scripts/smoke_test.py",
+        repo_root / "tests/test_helper_security.py",
+        repo_root / "tests/test_state_recovery.py",
+    ]
     failures: list[str] = []
     for path in files:
         try:
@@ -108,6 +115,14 @@ def check_python_compile(report: Reporter, repo_root: Path) -> None:
         report.fail("python syntax valid", "; ".join(failures))
     else:
         report.ok("python syntax valid", ", ".join(str(p.relative_to(repo_root)) for p in files))
+
+
+def check_security_regression_tests(report: Reporter, repo_root: Path) -> None:
+    result = run([sys.executable, "-m", "unittest", "tests/test_helper_security.py", "tests/test_state_recovery.py"], cwd=repo_root, timeout=120)
+    if result.returncode != 0:
+        report.fail("security regression tests pass", result.stdout.strip()[-800:])
+        return
+    report.ok("security regression tests pass", "helper boundary and state recovery")
 
 
 def check_hermes_repo(report: Reporter, hermes_repo: Path) -> bool:
@@ -299,6 +314,7 @@ def main() -> int:
 
     check_repo_files(report, repo_root)
     check_python_compile(report, repo_root)
+    check_security_regression_tests(report, repo_root)
     hermes_ok = check_hermes_repo(report, hermes_repo)
     if hermes_ok:
         check_temp_generation(report, repo_root, hermes_repo, args.host, args.port)

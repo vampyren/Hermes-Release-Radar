@@ -12,6 +12,7 @@ import json
 import os
 import re
 import subprocess
+import tempfile
 import urllib.parse
 import urllib.request
 from collections import Counter, defaultdict
@@ -52,8 +53,20 @@ def now_iso() -> str:
     return datetime.datetime.now().astimezone().isoformat(timespec="seconds")
 
 
-def sh(args: list[str], check: bool = True) -> str:
-    r = subprocess.run(args, cwd=str(REPO), text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+def sh(args: list[str], check: bool = True, timeout: int = 120) -> str:
+    try:
+        r = subprocess.run(
+            args,
+            cwd=str(REPO),
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            timeout=timeout,
+        )
+    except FileNotFoundError:
+        if check:
+            raise
+        return f"{args[0]} command not found"
     if check and r.returncode != 0:
         raise RuntimeError(f"command failed: {' '.join(args)}\n{r.stdout}")
     return r.stdout.strip()
@@ -109,20 +122,30 @@ def empty_collect(repo_health: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def default_state() -> dict[str, Any]:
+    repo_health = check_repo_health()
+    head = sh(["git", "rev-parse", "HEAD"]) if repo_health.get("ok") else ""
+    return {
+        "schema": 2,
+        "hermes_repo": str(REPO),
+        "baseline_commit": head,
+        "baseline_label": "Initial Release Radar baseline" if head else "Waiting for Hermes checkout",
+        "review_markers": [],
+        "history": [],
+    }
+
+
 def load_state() -> dict[str, Any]:
     if STATE_PATH.exists():
-        state = json.loads(STATE_PATH.read_text(encoding="utf-8"))
+        try:
+            state = json.loads(STATE_PATH.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            backup = STATE_PATH.with_suffix(".json.corrupt")
+            STATE_PATH.replace(backup)
+            state = default_state()
+            state["state_warning"] = f"Previous state.json was corrupt and moved to {backup}"
     else:
-        repo_health = check_repo_health()
-        head = sh(["git", "rev-parse", "HEAD"]) if repo_health.get("ok") else ""
-        state = {
-            "schema": 2,
-            "hermes_repo": str(REPO),
-            "baseline_commit": head,
-            "baseline_label": "Initial Release Radar baseline" if head else "Waiting for Hermes checkout",
-            "review_markers": [],
-            "history": [],
-        }
+        state = default_state()
     state.setdefault("schema", 2)
     state.setdefault("review_markers", [])
     state.setdefault("history", [])
@@ -132,7 +155,11 @@ def load_state() -> dict[str, Any]:
 def save_state(state: dict[str, Any]) -> None:
     state["schema"] = max(int(state.get("schema", 1)), 2)
     state["hermes_repo"] = str(REPO)
-    STATE_PATH.write_text(json.dumps(state, indent=2, ensure_ascii=False), encoding="utf-8")
+    STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.NamedTemporaryFile("w", encoding="utf-8", dir=STATE_PATH.parent, prefix=f"{STATE_PATH.name}.", suffix=".tmp", delete=False) as fh:
+        tmp = Path(fh.name)
+        json.dump(state, fh, indent=2, ensure_ascii=False)
+    os.replace(tmp, STATE_PATH)
 
 
 def parse_version(text: str) -> dict[str, str]:

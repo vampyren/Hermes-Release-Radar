@@ -14,9 +14,11 @@ or modify the Hermes checkout.
 from __future__ import annotations
 
 import http.server
+import ipaddress
 import json
 import os
 import subprocess
+import tempfile
 from pathlib import Path
 
 ROOT = Path(os.environ.get("RELEASE_RADAR_ROOT", Path.home() / ".hermes" / "release-radar")).expanduser()
@@ -24,6 +26,8 @@ REPO = Path(os.environ.get("RELEASE_RADAR_HERMES_REPO", Path.home() / ".hermes" 
 GENERATE = ROOT / "generate.py"
 STATE_PATH = ROOT / "state.json"
 HOST = os.environ.get("RELEASE_RADAR_HOST", "127.0.0.1")
+LOCAL_HOSTS = {"127.0.0.1", "localhost", "::1"}
+ALLOWED_STATIC = {"/", "/index.html", "/history.html", "/help.html"}
 try:
     PORT = int(os.environ.get("RELEASE_RADAR_PORT", "8765"))
 except ValueError as exc:
@@ -31,15 +35,32 @@ except ValueError as exc:
 
 
 def load_state() -> dict:
-    if STATE_PATH.exists():
-        return json.loads(STATE_PATH.read_text(encoding="utf-8"))
-    return {"schema": 1, "hermes_repo": str(REPO), "review_markers": []}
+    if not STATE_PATH.exists():
+        return {"schema": 2, "hermes_repo": str(REPO), "review_markers": []}
+    try:
+        state = json.loads(STATE_PATH.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        backup = STATE_PATH.with_suffix(".json.corrupt")
+        STATE_PATH.replace(backup)
+        return {
+            "schema": 2,
+            "hermes_repo": str(REPO),
+            "review_markers": [],
+            "state_warning": f"Previous state.json was corrupt and moved to {backup}",
+        }
+    state.setdefault("schema", 2)
+    state.setdefault("review_markers", [])
+    return state
 
 
 def save_state(state: dict) -> None:
-    state.setdefault("schema", 1)
+    state["schema"] = max(int(state.get("schema", 1)), 2)
     state["hermes_repo"] = str(REPO)
-    STATE_PATH.write_text(json.dumps(state, indent=2), encoding="utf-8")
+    STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.NamedTemporaryFile("w", encoding="utf-8", dir=STATE_PATH.parent, prefix=f"{STATE_PATH.name}.", suffix=".tmp", delete=False) as fh:
+        tmp = Path(fh.name)
+        json.dump(state, fh, indent=2, ensure_ascii=False)
+    os.replace(tmp, STATE_PATH)
 
 
 def regenerate(refresh: bool = False) -> str:
@@ -70,11 +91,33 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         super().__init__(*args, directory=str(ROOT), **kwargs)
 
     def end_headers(self):
-        # Allows a file:// copy of index.html to still check/call the local helper.
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.send_header("Cache-Control", "no-store")
         super().end_headers()
+
+    def _host_value(self, header_name: str) -> str:
+        value = self.headers.get(header_name) or ""
+        if header_name.lower() == "origin" and "://" in value:
+            from urllib.parse import urlparse
+            value = urlparse(value).hostname or ""
+        elif value.startswith("[") and "]" in value:
+            value = value[1:value.index("]")]
+        else:
+            value = value.split(":", 1)[0]
+        return value.strip().lower()
+
+    def _is_local_request(self) -> bool:
+        host = self._host_value("Host")
+        origin = self._host_value("Origin")
+        peer = self.client_address[0] if self.client_address else ""
+        try:
+            peer_is_loopback = ipaddress.ip_address(peer).is_loopback
+        except ValueError:
+            peer_is_loopback = peer in LOCAL_HOSTS
+        return peer_is_loopback and host in LOCAL_HOSTS and (not origin or origin in LOCAL_HOSTS)
+
+    def _is_allowed_static(self) -> bool:
+        path = self.path.split("?", 1)[0]
+        return path in ALLOWED_STATIC
 
     def _json(self, code: int, payload: dict):
         body = json.dumps(payload).encode("utf-8")
@@ -93,8 +136,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         return json.loads(raw or "{}")
 
     def do_OPTIONS(self):
-        self.send_response(204)
-        self.end_headers()
+        return self._json(403, {"ok": False, "error": "CORS preflight is not supported; use the local helper page"})
 
     def do_GET(self):
         if self.path == "/api/status":
@@ -112,9 +154,14 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             })
         if self.path == "/api/state":
             return self._json(200, {"ok": True, "state": load_state()})
+        if not self._is_allowed_static():
+            return self._json(404, {"ok": False, "error": "not found"})
         return super().do_GET()
 
     def do_POST(self):
+        if not self._is_local_request():
+            return self._json(403, {"ok": False, "error": "local requests only"})
+
         if self.path == "/api/refresh":
             try:
                 subprocess.run(
