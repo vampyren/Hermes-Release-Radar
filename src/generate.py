@@ -48,6 +48,7 @@ RUNS = ROOT / "runs"
 GITHUB_RELEASES_API = "https://api.github.com/repos/NousResearch/hermes-agent/releases?per_page=8"
 APP_ICON_SVG = """<svg class="app-icon" viewBox="0 0 48 48" role="img" aria-label="Hermes Release Radar icon" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="radar-g" x1="8" y1="6" x2="40" y2="42" gradientUnits="userSpaceOnUse"><stop stop-color="#7ff6d7"/><stop offset="1" stop-color="#7aa7ff"/></linearGradient></defs><circle cx="24" cy="24" r="21" fill="#0b1419" stroke="url(#radar-g)" stroke-width="2.5"/><path d="M24 24 36.8 12.8" stroke="#7ff6d7" stroke-width="3" stroke-linecap="round"/><path d="M14 25a10 10 0 0 1 20 0M9.5 25a14.5 14.5 0 0 1 29 0" fill="none" stroke="#315a7e" stroke-width="2" stroke-linecap="round"/><circle cx="24" cy="24" r="4.2" fill="#62e6c8"/><circle cx="36.8" cy="12.8" r="3.2" fill="#ffc857"/></svg>"""
 FAVICON_DATA = urllib.parse.quote(APP_ICON_SVG.replace(' class="app-icon"', ''), safe="")
+GIT_WARNINGS: list[str] = []
 
 
 def now_iso() -> str:
@@ -120,6 +121,7 @@ def empty_collect(repo_health: dict[str, Any]) -> dict[str, Any]:
         "importance_counts": {},
         "category_commits": {},
         "recent_commits": [],
+        "git_warnings": [],
     }
 
 
@@ -156,8 +158,24 @@ def parse_version(text: str) -> dict[str, str]:
 def is_ancestor(older: str, newer: str) -> bool:
     if not older or not newer:
         return False
-    r = subprocess.run(["git", "merge-base", "--is-ancestor", older, newer], cwd=str(REPO), timeout=60)
-    return r.returncode == 0
+    try:
+        r = subprocess.run(
+            ["git", "merge-base", "--is-ancestor", older, newer],
+            cwd=str(REPO),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            timeout=60,
+        )
+    except subprocess.TimeoutExpired:
+        GIT_WARNINGS.append(f"git merge-base timed out while checking {older[:12]}..{newer[:12]}")
+        return False
+    if r.returncode == 0:
+        return True
+    if r.returncode == 1:
+        return False
+    GIT_WARNINGS.append(f"git merge-base failed for {older[:12]}..{newer[:12]}: {r.stdout.strip() or f'exit {r.returncode}'}")
+    return False
 
 
 def rev_parse(ref: str) -> str:
@@ -329,6 +347,7 @@ def releases_between(releases: list[dict[str, Any]], older: str, newer: str) -> 
 
 
 def collect() -> dict[str, Any]:
+    GIT_WARNINGS.clear()
     repo_health = check_repo_health()
     if not repo_health.get("ok"):
         return empty_collect(repo_health)
@@ -362,6 +381,7 @@ def collect() -> dict[str, Any]:
         "importance_counts": imp_counts,
         "category_commits": category_commits,
         "recent_commits": commits,
+        "git_warnings": GIT_WARNINGS,
     }
 
 
@@ -750,6 +770,8 @@ def render_page(data: dict[str, Any], state: dict[str, Any]) -> str:
         for c in data["recent_commits"]
     ) or '<section class="card"><p class="muted">No raw commits are available until Release Radar can read the Hermes checkout.</p></section>'
     modified = "".join(f"<li><code>{html.escape(m)}</code></li>" for m in data["modified"])
+    git_warning_rows = "".join(f"<li>{html.escape(w)}</li>" for w in data.get("git_warnings", []))
+    git_warnings = f'<section class="card warn"><h2>Git inspection warnings</h2><ul>{git_warning_rows}</ul><p class="muted">Release Radar continued without mutating Hermes; review these before trusting release-range calculations.</p></section>' if git_warning_rows else ""
     if modified:
         safety_note = f'<section class="card warn"><h2>Local Hermes modified files</h2><p>Review these before any approved Hermes update:</p><ul>{modified}</ul><p class="muted">Safety: Release Radar inspected git/release data only. It did not update, install, restart, reset, stash, or modify Hermes source.</p></section>'
     else:
@@ -785,6 +807,7 @@ def render_page(data: dict[str, Any], state: dict[str, Any]) -> str:
 <section id="tab-raw" class="tab-panel">
 <section class="card jump-overview"><h2>Jump to category</h2><details class="matters-context"><summary>Show raw-category context</summary><p class="muted">Raw commit groups are here for auditability. <b>{data['behind']}</b> unique pending commit(s) are in the current <code>HEAD..origin/main</code> range. Category numbers below use each commit’s primary category, so the visible category total matches the unique pending count.</p></details><div class="jumpgrid">{cat_nav}</div></section>
 {safety_note}
+{git_warnings}
 {render_markers_section(data, today_sv)}
 <section class="card"><h2>Current installed state</h2><pre>{html.escape(data['version_output'])}\n{html.escape(data['status'])}</pre><p>Baseline checkpoint: <code>{html.escape(state.get('baseline_commit','')[:12])}</code> — {html.escape(state.get('baseline_label',''))}</p></section>
 <h2>Raw categorized commits</h2>{cat_cards}

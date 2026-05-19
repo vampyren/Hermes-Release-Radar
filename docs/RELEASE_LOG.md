@@ -8,7 +8,8 @@ No unreleased changes.
 
 - Fixed P0 helper security issues by removing wildcard CORS behavior, rejecting CORS preflight, enforcing local-only POSTs with Host/Origin/peer loopback checks, and replacing whole-runtime static serving with an explicit HTML whitelist.
 - Added follow-up hardening for `/api/state`, review marker payload validation, maximum JSON body size, disabled directory listings before first generation, bounded `is_ancestor` git calls, and shared atomic/corrupt-state recovery helpers.
-- Added regression coverage for hostile `/api/state` reads, directory-listing prevention, marker validation, and request body limits.
+- Added regression coverage for hostile `/api/state` reads, directory-listing prevention, marker validation, request body limits, and temp-file cleanup on failed state writes.
+- Verification and hardening did not run `hermes update`, restart services, install packages, or perform destructive git operations.
 
 ## 0.4.2-local - 2026-05-19
 

@@ -39,6 +39,7 @@ class HelperServer:
         (self.root / "runs").mkdir()
         (self.root / "runs" / "snapshot.json").write_text("{}", encoding="utf-8")
         (self.root / "serve.py").write_text("secret", encoding="utf-8")
+        (self.root / "generate.py").write_text("#!/usr/bin/env python3\nprint('generated')\n", encoding="utf-8")
         env = os.environ.copy()
         env.update({
             "RELEASE_RADAR_ROOT": str(self.root),
@@ -97,6 +98,20 @@ class HelperSecurityTests(unittest.TestCase):
     def get(self, path: str):
         return urlopen(self.base + path, timeout=5)
 
+    def post_markers(self, markers) -> tuple[int, str]:
+        conn = http.client.HTTPConnection("127.0.0.1", self.server.port, timeout=5)
+        body = json.dumps({"review_markers": markers})
+        conn.putrequest("POST", "/api/markers", skip_host=True)
+        conn.putheader("Host", f"127.0.0.1:{self.server.port}")
+        conn.putheader("Content-Type", "application/json")
+        conn.putheader("Content-Length", str(len(body)))
+        conn.endheaders(body.encode("utf-8"))
+        response = conn.getresponse()
+        payload = response.read().decode("utf-8")
+        status = response.status
+        conn.close()
+        return status, payload
+
     def test_responses_do_not_allow_wildcard_cors(self) -> None:
         req = Request(self.base + "/api/status", headers={"Origin": "https://evil.example"})
         with urlopen(req, timeout=5) as response:
@@ -129,6 +144,23 @@ class HelperSecurityTests(unittest.TestCase):
         ctx.exception.close()
         self.assertEqual(ctx.exception.code, 403)
 
+    def test_api_state_rejects_non_local_host(self) -> None:
+        conn = http.client.HTTPConnection("127.0.0.1", self.server.port, timeout=5)
+        conn.putrequest("GET", "/api/state", skip_host=True)
+        conn.putheader("Host", "evil.example")
+        conn.endheaders()
+        response = conn.getresponse()
+        payload = response.read().decode("utf-8")
+        conn.close()
+        self.assertEqual(response.status, 403, payload)
+
+    def test_api_state_allows_normal_local_request(self) -> None:
+        with self.get("/api/state") as response:
+            payload = json.loads(response.read().decode("utf-8"))
+        self.assertEqual(response.status, 200)
+        self.assertTrue(payload["ok"])
+        self.assertEqual(payload["state"]["review_markers"], [])
+
     def test_state_changing_posts_reject_non_local_host(self) -> None:
         conn = http.client.HTTPConnection("127.0.0.1", self.server.port, timeout=5)
         body = json.dumps({"review_markers": []})
@@ -156,18 +188,47 @@ class HelperSecurityTests(unittest.TestCase):
         self.assertIn("too large", payload)
 
     def test_marker_validation_rejects_malformed_marker(self) -> None:
-        conn = http.client.HTTPConnection("127.0.0.1", self.server.port, timeout=5)
-        body = json.dumps({"review_markers": [{"id": "one", "commit": "not-a-hash", "target_id": "cat-Test"}]})
-        conn.putrequest("POST", "/api/markers", skip_host=True)
-        conn.putheader("Host", f"127.0.0.1:{self.server.port}")
-        conn.putheader("Content-Type", "application/json")
-        conn.putheader("Content-Length", str(len(body)))
-        conn.endheaders(body.encode("utf-8"))
-        response = conn.getresponse()
-        payload = response.read().decode("utf-8")
-        conn.close()
-        self.assertEqual(response.status, 400, payload)
+        status, payload = self.post_markers([{"id": "one", "commit": "not-a-hash", "target_id": "cat-Test"}])
+        self.assertEqual(status, 400, payload)
         self.assertIn("commit", payload)
+
+    def test_marker_validation_rejects_non_list(self) -> None:
+        status, payload = self.post_markers({"id": "not-a-list"})
+        self.assertEqual(status, 400, payload)
+        self.assertIn("must be a list", payload)
+
+    def test_marker_validation_rejects_too_many_markers(self) -> None:
+        status, payload = self.post_markers([{} for _ in range(serve.MAX_REVIEW_MARKERS + 1)])
+        self.assertEqual(status, 400, payload)
+        self.assertIn("at most", payload)
+
+    def test_marker_validation_rejects_non_dict_marker(self) -> None:
+        status, payload = self.post_markers(["not-an-object"])
+        self.assertEqual(status, 400, payload)
+        self.assertIn("must be an object", payload)
+
+    def test_marker_validation_rejects_huge_label(self) -> None:
+        status, payload = self.post_markers([{"label": "x" * (serve.MAX_MARKER_FIELD_CHARS + 1)}])
+        self.assertEqual(status, 400, payload)
+        self.assertIn("label is too long", payload)
+
+    def test_marker_validation_rejects_unknown_fields(self) -> None:
+        status, payload = self.post_markers([{"id": "one", "unexpected": "nope"}])
+        self.assertEqual(status, 400, payload)
+        self.assertIn("unsupported fields", payload)
+
+    def test_marker_validation_accepts_valid_marker(self) -> None:
+        marker = {
+            "id": "one",
+            "label": "Docs reviewed",
+            "commit": "abcdef1",
+            "target_id": "cat-docs",
+            "created_at": "2026-05-19T12:00:00+02:00",
+        }
+        status, payload = self.post_markers([marker])
+        self.assertEqual(status, 200, payload)
+        saved = json.loads((self.server.root / "state.json").read_text(encoding="utf-8"))
+        self.assertEqual(saved["review_markers"], [marker])
 
     def test_local_request_guard_checks_peer_address(self) -> None:
         fake = serve.Handler.__new__(serve.Handler)

@@ -48,6 +48,17 @@ class StateRecoveryTests(unittest.TestCase):
             self.assertEqual(saved["review_markers"], [{"id": "one"}])
             self.assertEqual(list(root.glob("state.json.*.tmp")), [])
 
+    def test_generate_save_state_cleans_temp_file_on_json_failure(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="release-radar-state-test-") as tmp:
+            root = Path(tmp)
+            generate = self.load_generate_with_root(root)
+
+            with self.assertRaises(TypeError):
+                generate.save_state({"bad": object()})
+
+            self.assertFalse((root / "state.json").exists())
+            self.assertEqual(list(root.glob("state.json.*.tmp")), [])
+
     def test_sh_check_false_handles_missing_command(self) -> None:
         with tempfile.TemporaryDirectory(prefix="release-radar-state-test-") as tmp:
             generate = self.load_generate_with_root(Path(tmp))

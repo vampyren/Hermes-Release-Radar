@@ -31,7 +31,7 @@ HOST = os.environ.get("RELEASE_RADAR_HOST", "127.0.0.1")
 LOCAL_HOSTS = {"127.0.0.1", "localhost", "::1"}
 ALLOWED_STATIC = {"/", "/index.html", "/history.html", "/help.html"}
 MAX_JSON_BODY_BYTES = 64 * 1024
-MAX_REVIEW_MARKERS = 500
+MAX_REVIEW_MARKERS = 200
 MAX_MARKER_FIELD_CHARS = 512
 COMMIT_RE = re.compile(r"^[0-9a-fA-F]{7,64}$")
 TARGET_RE = re.compile(r"^[A-Za-z0-9_.:-]{1,160}$")
@@ -69,6 +69,9 @@ def validate_markers(markers: object) -> list[dict]:
     for index, marker in enumerate(markers):
         if not isinstance(marker, dict):
             raise ValueError(f"review_markers[{index}] must be an object")
+        unexpected = sorted(set(marker) - {"id", "label", "commit", "target_id", "created_at"})
+        if unexpected:
+            raise ValueError(f"review_markers[{index}] has unsupported fields: {', '.join(unexpected)}")
         cleaned_marker: dict[str, str] = {}
         for key in ("id", "label", "commit", "target_id", "created_at"):
             value = marker.get(key, "")
