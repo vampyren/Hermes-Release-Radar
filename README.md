@@ -53,7 +53,7 @@ Set these environment variables only if your Hermes checkout, runtime folder, ho
 
 Human-readable impact cards summarize the important change clusters first, with representative commits still visible for auditability.
 
-![What actually matters view](docs/assets/screenshots/what-actually-matters.png?v=20260520-screenshots)
+![What actually matters view](docs/assets/screenshots/what-actually-matters.png?v=20260520-matters-content)
 
 ### Raw categorized commits
 
