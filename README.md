@@ -53,13 +53,13 @@ Set these environment variables only if your Hermes checkout, runtime folder, ho
 
 Human-readable impact cards summarize the important change clusters first, with representative commits still visible for auditability.
 
-![What actually matters view](docs/assets/screenshots/what-actually-matters.png)
+![What actually matters view](docs/assets/screenshots/what-actually-matters.png?v=20260520-screenshots)
 
 ### Raw categorized commits
 
 The raw view keeps the full commit trail grouped by category, with review markers and safety notes available in the same page.
 
-![Raw categorized commits view](docs/assets/screenshots/raw-categorized-commits.png)
+![Raw categorized commits view](docs/assets/screenshots/raw-categorized-commits.png?v=20260520-screenshots)
 
 ## Design language
 
