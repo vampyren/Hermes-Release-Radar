@@ -113,6 +113,7 @@ git clone https://github.com/vampyren/Hermes-Release-Radar.git ~/Apps/Hermes-Rel
 mkdir -p ~/.hermes/release-radar/runs ~/.config/systemd/user
 cp ~/Apps/Hermes-Release-Radar/src/generate.py ~/.hermes/release-radar/generate.py
 cp ~/Apps/Hermes-Release-Radar/src/serve.py ~/.hermes/release-radar/serve.py
+cp ~/Apps/Hermes-Release-Radar/src/state.py ~/.hermes/release-radar/state.py
 cp ~/Apps/Hermes-Release-Radar/HELP.md ~/.hermes/release-radar/HELP.md
 cp ~/Apps/Hermes-Release-Radar/docs/help.html ~/.hermes/release-radar/help.html
 python3 ~/.hermes/release-radar/generate.py
@@ -150,6 +151,7 @@ The smoke test checks repo files, Python syntax, a temporary-root generator run,
 ```text
 src/generate.py                          Local page generator
 src/serve.py                             Local-only helper server
+src/state.py                             Shared state helpers
 systemd/hermes-release-radar.service     User systemd service
 docs/help.html                           Rendered help page
 docs/RELEASE_LOG.md                      Project changelog
@@ -174,7 +176,7 @@ Git tags use the current project version with a leading `v`, for example `v0.2.7
 Release checklist:
 
 ```bash
-python3 -m py_compile src/generate.py src/serve.py scripts/render_help.py
+python3 -m py_compile src/generate.py src/serve.py src/state.py scripts/render_help.py
 git status --short --branch
 git tag -a vX.Y.Z-suffix -m "vX.Y.Z-suffix"
 git push origin vX.Y.Z-suffix
@@ -185,5 +187,5 @@ gh release create vX.Y.Z-suffix --title "vX.Y.Z-suffix" --notes-file /tmp/releas
 
 ```bash
 python3 scripts/smoke_test.py
-python3 -m py_compile src/generate.py src/serve.py scripts/render_help.py scripts/smoke_test.py
+python3 -m py_compile src/generate.py src/serve.py src/state.py scripts/render_help.py scripts/smoke_test.py
 ```

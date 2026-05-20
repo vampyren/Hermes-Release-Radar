@@ -245,7 +245,7 @@ def check_generated_ui_contract(report: Reporter, temp_root: Path) -> None:
 
 
 def check_runtime(report: Reporter, runtime_root: Path) -> None:
-    expected = ["index.html", "state.json", "generate.py", "serve.py"]
+    expected = ["index.html", "state.json", "generate.py", "serve.py", "state.py"]
     missing = [name for name in expected if not (runtime_root / name).is_file()]
     if missing:
         report.warn("installed runtime files present", f"missing under {runtime_root}: " + ", ".join(missing))

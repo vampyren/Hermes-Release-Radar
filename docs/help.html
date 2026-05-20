@@ -101,6 +101,8 @@ RELEASE_RADAR_PORT=8765</code></pre></div>
   ~/.hermes/release-radar/generate.py
 cp ~/Apps/Hermes-Release-Radar/src/serve.py \
   ~/.hermes/release-radar/serve.py
+cp ~/Apps/Hermes-Release-Radar/src/state.py \
+  ~/.hermes/release-radar/state.py
 cp ~/Apps/Hermes-Release-Radar/HELP.md \
   ~/.hermes/release-radar/HELP.md
 cp ~/Apps/Hermes-Release-Radar/docs/help.html \
@@ -170,6 +172,7 @@ python3 scripts/smoke_test.py</code></pre></div>
 <h2>File locations</h2>
 <div class="cmd-card"><div class="cmd-top"><span>Command</span><button type="button" onclick="copyCode(this)">Copy</button></div><pre><code>~/.hermes/release-radar/generate.py      Generator
 ~/.hermes/release-radar/serve.py         Local helper server
+~/.hermes/release-radar/state.py         Shared state helpers
 ~/.hermes/release-radar/state.json       Review markers and checkpoints
 ~/.hermes/release-radar/index.html       Current radar page
 ~/.hermes/release-radar/history.html     Installed-update history
@@ -179,7 +182,7 @@ python3 scripts/smoke_test.py</code></pre></div>
 <p>Before publishing or changing the service, verify:</p>
 <ul>
 <li><code>python3 scripts/smoke_test.py</code> passes from the repo checkout.</li>
-<li><code>python3 -m py_compile src/generate.py src/serve.py scripts/render_help.py scripts/smoke_test.py</code> passes.</li>
+<li><code>python3 -m py_compile src/generate.py src/serve.py src/state.py scripts/render_help.py scripts/smoke_test.py</code> passes.</li>
 <li><code>python3 ~/.hermes/release-radar/generate.py</code> regenerates <code>index.html</code>.</li>
 <li><code>systemctl --user status hermes-release-radar.service</code> is healthy.</li>
 <li><code>curl -s <a href="http://127.0.0.1:8765/api/status">http://127.0.0.1:8765/api/status</a></code> returns <code>&quot;ok&quot;: true</code>.</li>

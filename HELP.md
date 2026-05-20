@@ -65,6 +65,8 @@ cp ~/Apps/Hermes-Release-Radar/src/generate.py \
   ~/.hermes/release-radar/generate.py
 cp ~/Apps/Hermes-Release-Radar/src/serve.py \
   ~/.hermes/release-radar/serve.py
+cp ~/Apps/Hermes-Release-Radar/src/state.py \
+  ~/.hermes/release-radar/state.py
 cp ~/Apps/Hermes-Release-Radar/HELP.md \
   ~/.hermes/release-radar/HELP.md
 cp ~/Apps/Hermes-Release-Radar/docs/help.html \
@@ -198,6 +200,7 @@ The service does not currently implement `systemctl --user reload hermes-release
 ```text
 ~/.hermes/release-radar/generate.py      Generator
 ~/.hermes/release-radar/serve.py         Local helper server
+~/.hermes/release-radar/state.py         Shared state helpers
 ~/.hermes/release-radar/state.json       Review markers and checkpoints
 ~/.hermes/release-radar/index.html       Current radar page
 ~/.hermes/release-radar/history.html     Installed-update history
@@ -209,7 +212,7 @@ The service does not currently implement `systemctl --user reload hermes-release
 
 Before publishing or changing the service, verify:
 - `python3 scripts/smoke_test.py` passes from the repo checkout.
-- `python3 -m py_compile src/generate.py src/serve.py scripts/render_help.py scripts/smoke_test.py` passes.
+- `python3 -m py_compile src/generate.py src/serve.py src/state.py scripts/render_help.py scripts/smoke_test.py` passes.
 - `python3 ~/.hermes/release-radar/generate.py` regenerates `index.html`.
 - `systemctl --user status hermes-release-radar.service` is healthy.
 - `curl -s http://127.0.0.1:8765/api/status` returns `"ok": true`.
