@@ -4,6 +4,14 @@
 
 No unreleased changes.
 
+## 0.4.4-local - 2026-05-23
+
+- Fixed the Installed summary card showing `unknown` when the local helper service could inspect the Hermes checkout but could not find the `hermes` console script on its systemd `PATH`.
+- Added a direct, read-only fallback that reads `hermes_cli/__init__.py` from the configured `RELEASE_RADAR_HERMES_REPO` checkout for `__version__` and `__release_date__` when `hermes --version` is unavailable or unparsable.
+- Preserved the preferred CLI source of truth when available; the fallback only prevents a local wrapper/PATH issue from hiding the actual checked-out Hermes version.
+- Added regression coverage for the minimal-`PATH` helper scenario so generated pages keep showing the local version instead of degrading to `Unknown` after branch switching or local feature testing.
+- Runtime testing installed the fixed generator locally after backing up the previous runtime generator; no `hermes update`, package install, force-push, destructive git operation, public helper exposure, or service restart was performed.
+
 ## 0.4.3-local - 2026-05-19
 
 - Fixed P0 helper security issues by removing wildcard CORS behavior, rejecting CORS preflight, enforcing local-only POSTs with Host/Origin/peer loopback checks, and replacing whole-runtime static serving with an explicit HTML whitelist.

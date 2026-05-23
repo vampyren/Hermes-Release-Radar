@@ -15,9 +15,9 @@ sys.path.insert(0, str(REPO_ROOT / "src"))
 
 
 class StateRecoveryTests(unittest.TestCase):
-    def load_generate_with_root(self, root: Path):
+    def load_generate_with_root(self, root: Path, hermes_repo: Path | None = None):
         os.environ["RELEASE_RADAR_ROOT"] = str(root)
-        os.environ["RELEASE_RADAR_HERMES_REPO"] = str(REPO_ROOT)
+        os.environ["RELEASE_RADAR_HERMES_REPO"] = str(hermes_repo or REPO_ROOT)
         sys.modules.pop("generate", None)
         return importlib.import_module("generate")
 
@@ -66,6 +66,27 @@ class StateRecoveryTests(unittest.TestCase):
             output = generate.sh(["definitely-not-a-real-command-release-radar"], check=False)
 
             self.assertIn("command not found", output)
+
+    def test_version_output_falls_back_to_local_source_when_hermes_cli_missing_from_path(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="release-radar-version-test-") as tmp:
+            root = Path(tmp) / "runtime"
+            hermes_repo = Path(tmp) / "hermes-agent"
+            package_dir = hermes_repo / "hermes_cli"
+            package_dir.mkdir(parents=True)
+            (package_dir / "__init__.py").write_text(
+                '__version__ = "9.8.7"\n__release_date__ = "2099.1.2"\n',
+                encoding="utf-8",
+            )
+            old_path = os.environ.get("PATH", "")
+            os.environ["PATH"] = "/usr/bin:/bin"
+            try:
+                generate = self.load_generate_with_root(root, hermes_repo)
+
+                output = generate.resolve_version_output()
+            finally:
+                os.environ["PATH"] = old_path
+
+            self.assertEqual(output, "Hermes Agent v9.8.7 (2099.1.2)")
 
 
 if __name__ == "__main__":

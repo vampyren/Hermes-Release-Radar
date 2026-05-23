@@ -155,6 +155,41 @@ def parse_version(text: str) -> dict[str, str]:
     return {"raw": first, "version": m.group(1), "date": date, "tag": f"v{date}"}
 
 
+def local_source_version_output() -> str:
+    """Read the inspected Hermes checkout version without importing or executing it."""
+    init_path = REPO / "hermes_cli" / "__init__.py"
+    try:
+        text = init_path.read_text(encoding="utf-8")
+    except OSError:
+        return ""
+    version_match = re.search(r'^__version__\s*=\s*["\']([^"\']+)["\']', text, re.MULTILINE)
+    date_match = re.search(r'^__release_date__\s*=\s*["\']([^"\']+)["\']', text, re.MULTILINE)
+    if not version_match:
+        return ""
+    version = version_match.group(1).strip()
+    date = date_match.group(1).strip() if date_match else "local source"
+    if not version.startswith("v"):
+        version = f"v{version}"
+    return f"Hermes Agent {version} ({date})"
+
+
+def resolve_version_output() -> str:
+    """Prefer the installed CLI version, but fall back to the inspected checkout.
+
+    The systemd user service can run with a minimal PATH that does not include the
+    `hermes` console script. Release Radar still has direct read access to the
+    configured Hermes checkout, so the Installed card should not degrade to
+    Unknown just because the CLI wrapper is unavailable.
+    """
+    cli_output = sh(["hermes", "--version"], check=False) or ""
+    if parse_version(cli_output).get("version") != "unknown":
+        return cli_output
+    source_output = local_source_version_output()
+    if source_output:
+        return source_output
+    return cli_output or "Hermes CLI version unavailable"
+
+
 def is_ancestor(older: str, newer: str) -> bool:
     if not older or not newer:
         return False
@@ -351,7 +386,7 @@ def collect() -> dict[str, Any]:
     repo_health = check_repo_health()
     if not repo_health.get("ok"):
         return empty_collect(repo_health)
-    version_output = sh(["hermes", "--version"], check=False) or "Hermes CLI version unavailable"
+    version_output = resolve_version_output()
     status = sh(["git", "status", "--short", "--branch"])
     head = sh(["git", "rev-parse", "HEAD"])
     upstream = sh(["git", "rev-parse", "origin/main"])

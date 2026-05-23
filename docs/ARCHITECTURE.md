@@ -36,9 +36,10 @@ A separate public GitHub Pages generator and rebuild workflow were intentionally
 3. Page calls `/api/status` on load.
 4. Refresh button calls `/api/refresh`.
 5. `/api/refresh` runs `git fetch origin --quiet` in `RELEASE_RADAR_HERMES_REPO` and then regenerates the page.
-6. Marker buttons call `/api/markers`.
-7. `/api/markers` writes `review_markers` into `state.json` and regenerates the page.
-8. On first run, `src/generate.py` initializes `state.json` from the current `HEAD` of the user's configured Hermes checkout.
+6. During generation, `src/generate.py` reads the installed Hermes version from `hermes --version` when available; if the helper environment cannot find or parse that CLI wrapper, it falls back to reading `hermes_cli/__init__.py` in the configured checkout for `__version__` and `__release_date__`.
+7. Marker buttons call `/api/markers`.
+8. `/api/markers` writes `review_markers` into `state.json` and regenerates the page.
+9. On first run, `src/generate.py` initializes `state.json` from the current `HEAD` of the user's configured Hermes checkout.
 
 ## API
 
