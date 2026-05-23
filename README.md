@@ -4,7 +4,7 @@ Hermes Release Radar is a local, safe update-intelligence page for Hermes Agent.
 
 It answers: what changed upstream since the Hermes checkout I am running now, and what actually matters?
 
-Published project version: `0.4.3-local`.
+Published project version: `0.4.4-local`.
 
 ## Local URL
 
@@ -25,6 +25,7 @@ GitHub presentation is handled by README/docs/screenshots. The previous separate
 ## What it does
 
 - Inspects the local Hermes Agent checkout at `~/.hermes/hermes-agent` by default.
+- Reads the installed Hermes version from `hermes --version` when available, with a direct checkout-source fallback so local helper/systemd `PATH` issues do not make the Installed card show `Unknown`.
 - Compares local `HEAD` with `origin/main`.
 - Generates a calm browser page with:
   - Official release notes, only when a newer release tag is actually ahead.
