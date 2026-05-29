@@ -155,6 +155,67 @@ def parse_version(text: str) -> dict[str, str]:
     return {"raw": first, "version": m.group(1), "date": date, "tag": f"v{date}"}
 
 
+def is_valid_checkpoint_label(label: str) -> bool:
+    """Return True only for a real checkpoint label, not operational error text.
+
+    Releases up to 0.4.4-local could persist version-detection error strings such
+    as ``hermes command not found`` or ``Hermes CLI version unavailable`` into
+    state.json as ``baseline_label``. Those, plus empty/``unknown`` placeholders
+    and any ``command not found`` / ``unavailable`` operational text, are rejected
+    so they can be migrated or replaced with a safe ``Checkpoint <shortsha>``.
+    """
+    text = (label or "").strip()
+    if not text:
+        return False
+    lowered = text.lower()
+    if lowered == "unknown":
+        return False
+    if "command not found" in lowered or "unavailable" in lowered:
+        return False
+    return True
+
+
+def checkpoint_label_for(version: dict[str, Any], commit: str) -> str:
+    """Pick a safe checkpoint label from a parsed version or fall back to the SHA.
+
+    Use the raw version string only when the version actually parsed and the raw
+    text is not an operational error; otherwise return ``Checkpoint <shortsha>``
+    so unknown/error version output never becomes a stored checkpoint label.
+    """
+    raw = (version or {}).get("raw", "")
+    if (version or {}).get("version", "unknown") != "unknown" and is_valid_checkpoint_label(raw):
+        return raw
+    return f"Checkpoint {(commit or '')[:12]}"
+
+
+def migrate_baseline_label(state: dict[str, Any], data: dict[str, Any]) -> None:
+    """Repair a stale/invalid persisted baseline_label without touching the commit.
+
+    The renderer prints ``baseline_label`` verbatim in the "Current installed
+    state" card, so an old bad value (for example ``hermes command not found``)
+    persisted before the installed-version fallback fix stays visible even after
+    the live version detection recovers. Replace an invalid label with the valid
+    current version when the baseline still points at HEAD, otherwise with a
+    neutral ``Checkpoint <shortsha>``. ``baseline_commit`` is never mutated here.
+    """
+    if is_valid_checkpoint_label(state.get("baseline_label", "")):
+        return
+    baseline = state.get("baseline_commit") or ""
+    if not baseline:
+        return
+    head = data.get("head") or ""
+    current_version = data.get("current_version", {}) or {}
+    if (
+        head
+        and baseline == head
+        and current_version.get("version", "unknown") != "unknown"
+        and is_valid_checkpoint_label(current_version.get("raw", ""))
+    ):
+        state["baseline_label"] = current_version["raw"]
+    else:
+        state["baseline_label"] = f"Checkpoint {baseline[:12]}"
+
+
 def local_source_version_output() -> str:
     """Read the inspected Hermes checkout version without importing or executing it."""
     init_path = REPO / "hermes_cli" / "__init__.py"
@@ -913,7 +974,7 @@ def archive_if_head_advanced(state: dict[str, Any], data: dict[str, Any]) -> Non
     head = data["head"]
     if not baseline:
         state["baseline_commit"] = head
-        state["baseline_label"] = data.get("current_version", {}).get("raw", "Initial baseline")
+        state["baseline_label"] = checkpoint_label_for(data.get("current_version", {}), head)
         return
     if baseline == head:
         return
@@ -937,7 +998,7 @@ def archive_if_head_advanced(state: dict[str, Any], data: dict[str, Any]) -> Non
         }
         state.setdefault("history", []).append(record)
         state["baseline_commit"] = head
-        state["baseline_label"] = new_version.get("raw", f"Checkpoint {head[:12]}")
+        state["baseline_label"] = checkpoint_label_for(new_version, head)
         state["review_markers"] = []
         state["checkpoint_notice"] = f"Archived {len(commits)} installed commits into history and moved baseline to {head[:12]}."
     else:
@@ -950,6 +1011,7 @@ def main():
     state = load_state()
     data = collect()
     data["new_since_refresh"] = build_new_since_refresh(state, data)
+    migrate_baseline_label(state, data)
     archive_if_head_advanced(state, data)
     state["last_generated_at"] = data["generated_at"]
     state["last_refresh_highlights"] = data.get("new_since_refresh", {})

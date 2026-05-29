@@ -4,6 +4,14 @@
 
 No unreleased changes.
 
+## 0.4.5-local - 2026-05-30
+
+- Migrated stale persisted baseline checkpoint labels so the "Current installed state" card no longer shows operational error text like `hermes command not found` after the installed-version fallback fix recovered the real version.
+- When an invalid `baseline_label` is found in `state.json` and the stored `baseline_commit` still matches current HEAD with a valid detected version, the label is repaired to the real current version string (for example `Hermes Agent v0.15.0 (2026.5.28)`); otherwise it falls back to a neutral `Checkpoint <shortsha>`. The `baseline_commit` value is never mutated by this migration.
+- Blocked future invalid labels: `archive_if_head_advanced()` now stores a version label only when the version parsed and the raw text is not a command-not-found/unavailable error, using `Checkpoint <shortsha>` otherwise via the shared `is_valid_checkpoint_label()` / `checkpoint_label_for()` helpers.
+- Added regression coverage for repairing `hermes command not found` to the valid current version when the baseline matches HEAD, repairing to `Checkpoint <shortsha>` when it cannot be mapped, leaving valid labels untouched, and never writing invalid raw version text during checkpoint archival.
+- Safety: no `hermes update`, package install, force-push, destructive git operation (reset/stash/restore/clean), public helper exposure, or service restart was performed; the Hermes checkout was inspected read-only and not mutated.
+
 ## 0.4.4-local - 2026-05-23
 
 - Fixed the Installed summary card showing `unknown` when the local helper service could inspect the Hermes checkout but could not find the `hermes` console script on its systemd `PATH`.
