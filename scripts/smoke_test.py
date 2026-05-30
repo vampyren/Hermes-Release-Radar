@@ -229,10 +229,15 @@ def check_generated_ui_contract(report: Reporter, temp_root: Path) -> None:
         report.ok("category counts sum to unique pending range", f"{category_total} primary-category commit(s)")
     contracts = {
         "refresh controls stay below helper text": [".helperbar{display:grid;grid-template-columns:1fr", ".helper-actions", "justify-content:flex-start", "Refreshing: git fetch origin"],
-        "category counts are unique primary-category commits": ["unique pending commit(s)", "primary category", "visible category total matches", "jump-unit"],
         "refresh preserves active tab": ["function activeTabHash()", "const activeHash = activeTabHash()", "name.startsWith('cat-')"],
-        "matters cards use category-grounded pending commits": ["same primary categories as Raw", "Open raw", "small red <b>+N</b> badges", "not the total pending count", "signal-label", "matter-card.good,.matter-card.warn,.matter-card.neutral", "matters-context", "jump-overview", "Show raw-category context", "border:1px solid #264e46", "box-shadow:inset 2px 0 0 #2a6d61"],
     }
+    # The category and #matters guards only have content to match when the
+    # inspected checkout is behind upstream. An up-to-date checkout (behind == 0)
+    # renders no category jump tiles or #matters cards, so requiring their markers
+    # would be a false failure independent of the generator code.
+    if behind > 0:
+        contracts["category counts are unique primary-category commits"] = ["unique pending commit(s)", "primary category", "visible category total matches", "jump-unit"]
+        contracts["matters cards use category-grounded pending commits"] = ["same primary categories as Raw", "Open raw", "small red <b>+N</b> badges", "not the total pending count", "signal-label", "matter-card.good,.matter-card.warn,.matter-card.neutral", "matters-context", "jump-overview", "Show raw-category context", "border:1px solid #264e46", "box-shadow:inset 2px 0 0 #2a6d61"]
     failures = []
     for name, needles in contracts.items():
         missing = [needle for needle in needles if needle not in html_text]
@@ -240,8 +245,10 @@ def check_generated_ui_contract(report: Reporter, temp_root: Path) -> None:
             failures.append(f"{name}: missing {', '.join(missing)}")
     if failures:
         report.fail("generated UI contract checked", "; ".join(failures))
-    else:
+    elif behind > 0:
         report.ok("generated UI contract checked", "layout/count/tab/#matters guards present")
+    else:
+        report.ok("generated UI contract checked", "layout/tab guards present (checkout up to date: category/#matters guards skipped)")
     nav_problems = []
     if '<a href="index.html">Current</a>' in html_text:
         nav_problems.append('redundant "Current" nav link still present')
