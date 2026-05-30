@@ -242,10 +242,25 @@ def check_generated_ui_contract(report: Reporter, temp_root: Path) -> None:
         report.fail("generated UI contract checked", "; ".join(failures))
     else:
         report.ok("generated UI contract checked", "layout/count/tab/#matters guards present")
+    nav_problems = []
+    if '<a href="index.html">Current</a>' in html_text:
+        nav_problems.append('redundant "Current" nav link still present')
+    if ">History (" not in html_text:
+        nav_problems.append("History nav link/count missing")
+    if 'class="help-icon"' not in html_text:
+        nav_problems.append("help icon missing")
+    if 'class="brand" href="index.html"' not in html_text:
+        nav_problems.append("brand link to index.html missing")
+    if 'class="app-version"' not in html_text:
+        nav_problems.append("Release Radar version badge missing")
+    if nav_problems:
+        report.fail("top nav cleanup + version badge", "; ".join(nav_problems))
+    else:
+        report.ok("top nav cleanup + version badge", "no Current link; History+help+brand+version badge intact")
 
 
 def check_runtime(report: Reporter, runtime_root: Path) -> None:
-    expected = ["index.html", "state.json", "generate.py", "serve.py", "state.py"]
+    expected = ["index.html", "state.json", "generate.py", "serve.py", "state.py", "VERSION"]
     missing = [name for name in expected if not (runtime_root / name).is_file()]
     if missing:
         report.warn("installed runtime files present", f"missing under {runtime_root}: " + ", ".join(missing))

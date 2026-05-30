@@ -4,7 +4,7 @@ Hermes Release Radar is a local, safe update-intelligence page for Hermes Agent.
 
 It answers: what changed upstream since the Hermes checkout I am running now, and what actually matters?
 
-Published project version: `0.4.5-local`.
+Published project version: `0.4.6-local`.
 
 ## Local URL
 
@@ -115,6 +115,7 @@ mkdir -p ~/.hermes/release-radar/runs ~/.config/systemd/user
 cp ~/Apps/Hermes-Release-Radar/src/generate.py ~/.hermes/release-radar/generate.py
 cp ~/Apps/Hermes-Release-Radar/src/serve.py ~/.hermes/release-radar/serve.py
 cp ~/Apps/Hermes-Release-Radar/src/state.py ~/.hermes/release-radar/state.py
+cp ~/Apps/Hermes-Release-Radar/VERSION ~/.hermes/release-radar/VERSION
 cp ~/Apps/Hermes-Release-Radar/HELP.md ~/.hermes/release-radar/HELP.md
 cp ~/Apps/Hermes-Release-Radar/docs/help.html ~/.hermes/release-radar/help.html
 python3 ~/.hermes/release-radar/generate.py
