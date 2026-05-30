@@ -4,6 +4,14 @@
 
 No unreleased changes.
 
+## 0.4.8-local - 2026-05-30
+
+- Fixed stale `Review markers` lingering after a Hermes update + Release Radar refresh: review markers are now reconciled server/generator-side against the current pending `HEAD..origin/main` view before `state.json` is saved and before the page is rendered (not only in the browser).
+- When there are no pending upstream commits (`behind == 0`), all current-page review markers are cleared — there is nothing left to review.
+- When commits are still pending (`behind > 0`), a marker is kept only when its target is still rendered (a global `top` marker, a category target from `category_counts`, or a raw commit target from `recent_commits`) and, for non-`top` markers carrying a commit hash, only when that commit is still in the pending set; markers whose category/commit has been implemented are pruned.
+- Installed-update history is untouched: `archive_if_head_advanced()` still snapshots the full marker set into history when HEAD advances, and pruning runs after archival so no archived marker information is lost.
+- Release Radar still never runs `hermes update`, never mutates the Hermes checkout, and performs only read-only git inspection.
+
 ## 0.4.7-local - 2026-05-30
 
 - Fixed a visual regression where the History page no longer felt seamless with the main page: its top bar and frame used a flat background and a narrower (`1100px`) content width instead of the main page's radial-gradient background and `1180px` width.

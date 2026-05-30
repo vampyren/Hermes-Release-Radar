@@ -233,6 +233,95 @@ class BaselineLabelMigrationTests(unittest.TestCase):
             self.assertTrue(generate.is_valid_checkpoint_label(state["baseline_label"]))
             self.assertEqual(state["baseline_label"], f"Checkpoint {second[:12]}")
 
+    def _pending_data(self, generate, recent, categories):
+        return {
+            "repo_ok": True,
+            "behind": len(recent),
+            "category_counts": {cat: 1 for cat in categories},
+            "recent_commits": recent,
+        }
+
+    def test_prune_keeps_markers_still_in_pending_view(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="release-radar-prune-test-") as tmp:
+            generate = self.load_generate_with_root(Path(tmp))
+            recent = [{"full": "a" * 40, "short": "aaaaaaa"}, {"full": "b" * 40, "short": "bbbbbbb"}]
+            data = self._pending_data(generate, recent, ["CLI/TUI"])
+            cat_target = generate.anchor_id("cat", "CLI/TUI")
+            state = {"review_markers": [
+                {"id": "1", "target_id": "top", "commit": "a" * 40},          # global -> keep
+                {"id": "2", "target_id": cat_target, "commit": "a" * 40},     # category rendered + commit pending -> keep
+                {"id": "3", "target_id": "commit-bbbbbbb", "commit": "b" * 40},  # raw commit still pending -> keep
+            ], "history": []}
+
+            generate.prune_review_markers(state, data)
+
+            self.assertEqual([m["id"] for m in state["review_markers"]], ["1", "2", "3"])
+
+    def test_prune_removes_markers_for_disappeared_targets_and_commits(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="release-radar-prune-test-") as tmp:
+            generate = self.load_generate_with_root(Path(tmp))
+            recent = [{"full": "a" * 40, "short": "aaaaaaa"}]
+            data = self._pending_data(generate, recent, ["CLI/TUI"])
+            cli_target = generate.anchor_id("cat", "CLI/TUI")
+            gone_cat_target = generate.anchor_id("cat", "Docs")
+            state = {"review_markers": [
+                {"id": "top", "target_id": "top", "commit": "a" * 40},               # keep
+                {"id": "gone-cat", "target_id": gone_cat_target, "commit": "a" * 40},  # category no longer rendered -> drop
+                {"id": "gone-commit", "target_id": "commit-zzzzzzz", "commit": "z" * 40},  # raw commit gone -> drop
+                {"id": "impl", "target_id": cli_target, "commit": "c" * 40},          # category rendered but commit implemented -> drop
+            ], "history": []}
+
+            generate.prune_review_markers(state, data)
+
+            self.assertEqual([m["id"] for m in state["review_markers"]], ["top"])
+
+    def test_prune_clears_all_markers_when_behind_zero(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="release-radar-prune-test-") as tmp:
+            generate = self.load_generate_with_root(Path(tmp))
+            data = {"repo_ok": True, "behind": 0, "category_counts": {}, "recent_commits": []}
+            state = {"review_markers": [
+                {"id": "top", "target_id": "top", "commit": "a" * 40},
+                {"id": "cat", "target_id": generate.anchor_id("cat", "CLI/TUI"), "commit": "a" * 40},
+            ], "history": [{"some": "history"}]}
+
+            generate.prune_review_markers(state, data)
+
+            self.assertEqual(state["review_markers"], [])
+            # Installed-update history must not be touched by pruning.
+            self.assertEqual(state["history"], [{"some": "history"}])
+
+    def test_prune_skips_when_repo_not_ok(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="release-radar-prune-test-") as tmp:
+            generate = self.load_generate_with_root(Path(tmp))
+            markers = [{"id": "1", "target_id": "top", "commit": "a" * 40}]
+            state = {"review_markers": list(markers), "history": []}
+            # A failed repo read (repo_ok False, behind 0) must NOT wipe markers.
+            generate.prune_review_markers(state, {"repo_ok": False, "behind": 0, "category_counts": {}, "recent_commits": []})
+            self.assertEqual(state["review_markers"], markers)
+
+    def test_archive_preserves_review_markers_in_history_then_prune_no_ops(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="release-radar-archive-prune-test-") as tmp:
+            root = Path(tmp) / "runtime"
+            hermes_repo = Path(tmp) / "hermes-agent"
+            first, second = self.make_git_repo(hermes_repo)
+            generate = self.load_generate_with_root(root, hermes_repo)
+
+            existing_markers = [{"id": "m1", "target_id": "top", "commit": first}]
+            state = {"baseline_commit": first, "baseline_label": "Hermes Agent v0.14.0 (2026.4.1)", "review_markers": list(existing_markers), "history": []}
+            data = {"repo_ok": True, "head": second, "generated_at": "2026-05-30T00:00:00+00:00",
+                    "current_version": generate.parse_version("Hermes Agent v0.15.0 (2026.5.28)"),
+                    "latest_release": {}, "reachable_releases": [], "behind": 0, "category_counts": {}, "recent_commits": []}
+
+            generate.archive_if_head_advanced(state, data)
+            # Archive snapshots the full marker set into history and clears the live set.
+            self.assertEqual(state["history"][-1]["review_markers_archived"], existing_markers)
+            self.assertEqual(state["review_markers"], [])
+
+            # Pruning after archive is a no-op on the now-empty live set; history intact.
+            generate.prune_review_markers(state, data)
+            self.assertEqual(state["review_markers"], [])
+            self.assertEqual(state["history"][-1]["review_markers_archived"], existing_markers)
+
 
 if __name__ == "__main__":
     unittest.main()
