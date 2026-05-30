@@ -1082,6 +1082,55 @@ def archive_if_head_advanced(state: dict[str, Any], data: dict[str, Any]) -> Non
         state["checkpoint_warning"] = f"Stored baseline {baseline[:12]} is not an ancestor of current HEAD {head[:12]}; not auto-archiving. Manual checkpoint review needed."
 
 
+def prune_review_markers(state: dict[str, Any], data: dict[str, Any]) -> None:
+    """Drop review markers that no longer map to the current pending view.
+
+    Review markers are local "reviewed through here" state tied to the pending
+    HEAD..origin/main commits shown on the current page. After Hermes is updated
+    and Release Radar refreshes, implemented commits leave that pending view, so
+    their markers are stale and must not linger under "Review markers". This runs
+    after archive_if_head_advanced(), which already snapshots the full marker set
+    into installed-update history when HEAD advances — so pruning here never
+    touches state["history"] or that archived copy.
+
+    - behind == 0: no pending upstream commits remain, so all current-page markers
+      are cleared.
+    - behind > 0: keep a marker only when its target is still rendered — a
+      'top'/global marker, a category target id derived from category_counts, or a
+      raw commit target id from recent_commits — and, for non-top markers that
+      carry a commit hash, only when that commit is still in the pending set.
+    """
+    if not data.get("repo_ok", True):
+        return  # no reliable pending view to reconcile against; leave markers as-is
+    markers = state.get("review_markers") or []
+    if not markers:
+        return
+    behind = int(data.get("behind", 0) or 0)
+    if behind == 0:
+        state["review_markers"] = []
+        return
+    recent = data.get("recent_commits") or []
+    category_targets = {anchor_id("cat", cat) for cat in (data.get("category_counts") or {})}
+    commit_targets = {f"commit-{c.get('short', '')}" for c in recent}
+    valid_targets = category_targets | commit_targets
+    pending_commits = {c.get("full", "") for c in recent} | {c.get("short", "") for c in recent}
+    pending_commits.discard("")
+    kept: list[dict[str, Any]] = []
+    for marker in markers:
+        target = marker.get("target_id") or "top"
+        if target == "top":
+            kept.append(marker)  # global marker stays valid while commits are still pending
+            continue
+        if target not in valid_targets:
+            continue  # the category/commit this marker pointed at is no longer rendered
+        commit = marker.get("commit") or ""
+        if commit and commit not in pending_commits:
+            continue  # target still exists but this exact commit has been implemented
+        kept.append(marker)
+    if len(kept) != len(markers):
+        state["review_markers"] = kept
+
+
 def main():
     ROOT.mkdir(parents=True, exist_ok=True)
     RUNS.mkdir(parents=True, exist_ok=True)
@@ -1090,6 +1139,7 @@ def main():
     data["new_since_refresh"] = build_new_since_refresh(state, data)
     migrate_baseline_label(state, data)
     archive_if_head_advanced(state, data)
+    prune_review_markers(state, data)
     state["last_generated_at"] = data["generated_at"]
     state["last_refresh_highlights"] = data.get("new_since_refresh", {})
     state["last_version_output"] = data.get("version_output", "")
