@@ -257,6 +257,25 @@ def check_generated_ui_contract(report: Reporter, temp_root: Path) -> None:
         report.fail("top nav cleanup + version badge", "; ".join(nav_problems))
     else:
         report.ok("top nav cleanup + version badge", "no Current link; History+help+brand+version badge intact")
+    # History page must share the main page's outer frame/shell so navigating
+    # between them feels seamless (same background gradient + content width).
+    history_path = temp_root / "history.html"
+    shell_markers = ["radial-gradient(circle at 15% 0,#18342f 0,#0b1014 34rem)", "max-width:1180px"]
+    if not history_path.is_file():
+        report.fail("history page shares main shell", "history.html not generated")
+    else:
+        history_html = history_path.read_text(encoding="utf-8")
+        shell_problems = [m for m in shell_markers if m not in html_text or m not in history_html]
+        if "max-width:1100px" in history_html:
+            shell_problems.append("history still uses divergent 1100px content width")
+        if '<a href="index.html">Current</a>' in history_html:
+            shell_problems.append('redundant "Current" link still on history page')
+        if 'class="brand" href="index.html"' not in history_html:
+            shell_problems.append("history brand link back to index.html missing")
+        if shell_problems:
+            report.fail("history page shares main shell", "; ".join(shell_problems))
+        else:
+            report.ok("history page shares main shell", "same gradient + 1180px frame as the current page")
 
 
 def check_runtime(report: Reporter, runtime_root: Path) -> None:

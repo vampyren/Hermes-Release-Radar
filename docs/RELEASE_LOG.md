@@ -2,7 +2,10 @@
 
 ## Unreleased
 
-No unreleased changes.
+- Fixed a visual regression where the History page no longer felt seamless with the main page: its top bar and frame used a flat background and a narrower (`1100px`) content width instead of the main page's radial-gradient background and `1180px` width.
+- Extracted a single shared page shell (`SHELL_CSS`) used by both the current and history pages — same background gradient, content width, top bar, brand, version badge, card, and base resets — so the two pages stay in sync instead of duplicating near-identical wrapper styles.
+- Display-only: the top-bar version badge now drops the internal `-local` channel suffix (shows `0.4.6` instead of `0.4.6-local`); the raw `VERSION` value is unchanged for source/runtime logic.
+- Added regression coverage for the shared shell (history embeds the same shell, gradient, and `1180px` width; no stale `1100px`/`Current` link) and for the badge display formatting, plus a smoke-test check that the history page shares the main page's frame.
 
 ## 0.4.6-local - 2026-05-30
 
