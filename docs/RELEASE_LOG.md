@@ -2,7 +2,15 @@
 
 ## Unreleased
 
-No unreleased changes.
+- Fixed a visual regression where the History page no longer felt seamless with the main page: its top bar and frame used a flat background and a narrower (`1100px`) content width instead of the main page's radial-gradient background and `1180px` width.
+- Extracted a single shared page shell (`SHELL_CSS`) used by both the current and history pages — same background gradient, content width, top bar, brand, version badge, card, base resets, and `h1` rhythm — so the two pages stay in sync instead of duplicating near-identical wrapper styles.
+- Unified the top-bar brand: the history page now shows the same `Hermes Release Radar` brand (no `History` suffix) and the same top bar layout as the current page, so switching pages no longer shifts the header. You are still clearly on History via the page `h1`.
+- Made the top nav a single page-toggle link in one shared slot: the current page shows `History (N)` (to `history.html`) and the history page shows `Current` (to `index.html`); neither page self-links. The `?` help icon stays on both pages and the brand/logo remains a way back to the main page.
+- Aligned the history page heading: moved the `h1` rule into the shared shell so `Installed update history` lines up with the current page's heading rhythm instead of sitting lower (the page no longer feels jumpy when navigating).
+- Added frame-aligned toast notifications (top-right of the ~1180px content frame, not the viewport edge) so the helper-bar buttons give visible confirmation: `Check status` now reports online/offline with marker count and last-generated time, `Refresh from upstream` shows an in-progress toast and a `Refreshed ✓` toast that survives the page reload, and review-marker save/clear actions confirm whether the change was persisted to `state.json`, held only until reload (helper offline), or failed. Toasts are subtle (dark theme, soft border), auto-dismiss, are click-to-dismiss, and never fire on automatic page load.
+- Removed the redundant `Open service` link from the helper bar: it duplicated the brand/logo when viewing through the local helper (the normal case), so the brand/logo remains the single way to the app root.
+- Display-only: the top-bar version badge now drops the internal `-local` channel suffix (shows `0.4.6` instead of `0.4.6-local`); the raw `VERSION` value is unchanged for source/runtime logic.
+- Added regression coverage for the shared shell (history embeds the same shell, gradient, `1180px` width, shared `h1` rhythm, unified brand, and help icon; no stale `1100px` width), for the page-toggle nav (history shows a `Current` link to `index.html` and does not self-link to `history.html`), and for the badge display formatting, plus smoke-test checks that the history page shares the main page's frame and that the helper-bar buttons expose the frame-aligned toast layer with the `Open service` link removed.
 
 ## 0.4.6-local - 2026-05-30
 

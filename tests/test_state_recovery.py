@@ -160,6 +160,39 @@ class BaselineLabelMigrationTests(unittest.TestCase):
 
             self.assertEqual(state["baseline_label"], "Hermes Agent v0.14.0 (2026.4.1)")
 
+    def test_version_badge_strips_local_suffix_for_display(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="release-radar-badge-display-test-") as tmp:
+            generate = self.load_generate_with_root(Path(tmp))
+            # Raw version keeps the internal channel suffix; the badge does not.
+            self.assertTrue(generate.APP_VERSION.endswith("-local"))
+            self.assertEqual(generate.APP_VERSION_DISPLAY, generate.APP_VERSION.removesuffix("-local"))
+            self.assertNotIn("-local", generate.APP_VERSION_BADGE)
+            self.assertIn(f">{generate.APP_VERSION_DISPLAY}<", generate.APP_VERSION_BADGE)
+
+    def test_history_page_shares_main_page_shell(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="release-radar-shell-test-") as tmp:
+            generate = self.load_generate_with_root(Path(tmp))
+            history_html = generate.render_history({"history": []})
+            # History embeds the one shared shell verbatim instead of a divergent copy.
+            self.assertIn(generate.SHELL_CSS, history_html)
+            # Same frame as the main page: gradient background + 1180px content width.
+            self.assertIn("radial-gradient(circle at 15% 0,#18342f 0,#0b1014 34rem)", generate.SHELL_CSS)
+            self.assertIn("max-width:1180px", generate.SHELL_CSS)
+            # Shared page-header rhythm so the h1 lines up instead of sitting lower.
+            self.assertIn("h1{font-size:clamp(24px,6vw,32px);margin:0 0 4px}", generate.SHELL_CSS)
+            # The old divergent history shell (flat bg / 1100px) must be gone.
+            self.assertNotIn("max-width:1100px", history_html)
+            # Page toggle: history shows a "Current" link to index.html and does
+            # not self-link to history.html (the current page shows "History (N)").
+            self.assertIn('<a href="index.html">Current</a>', history_html)
+            self.assertNotIn('href="history.html"', history_html)
+            # Brand text stays unified ("Hermes Release Radar"), no "History" suffix.
+            self.assertNotIn("<span>Hermes Release Radar History</span>", history_html)
+            self.assertIn("<span>Hermes Release Radar</span>", history_html)
+            # Same topbar layout as the current page: brand links home + help icon.
+            self.assertIn('class="brand" href="index.html"', history_html)
+            self.assertIn('class="help-icon"', history_html)
+
     def test_app_version_prefers_repo_version_over_stale_runtime_root(self) -> None:
         with tempfile.TemporaryDirectory(prefix="release-radar-version-badge-test-") as tmp:
             root = Path(tmp)
