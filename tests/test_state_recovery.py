@@ -178,12 +178,20 @@ class BaselineLabelMigrationTests(unittest.TestCase):
             # Same frame as the main page: gradient background + 1180px content width.
             self.assertIn("radial-gradient(circle at 15% 0,#18342f 0,#0b1014 34rem)", generate.SHELL_CSS)
             self.assertIn("max-width:1180px", generate.SHELL_CSS)
+            # Shared page-header rhythm so the h1 lines up instead of sitting lower.
+            self.assertIn("h1{font-size:clamp(24px,6vw,32px);margin:0 0 4px}", generate.SHELL_CSS)
             # The old divergent history shell (flat bg / 1100px) must be gone.
             self.assertNotIn("max-width:1100px", history_html)
-            # No redundant Current nav link survives on the history page.
-            self.assertNotIn('<a href="index.html">Current</a>', history_html)
-            # Brand still links back to the main page.
+            # Page toggle: history shows a "Current" link to index.html and does
+            # not self-link to history.html (the current page shows "History (N)").
+            self.assertIn('<a href="index.html">Current</a>', history_html)
+            self.assertNotIn('href="history.html"', history_html)
+            # Brand text stays unified ("Hermes Release Radar"), no "History" suffix.
+            self.assertNotIn("<span>Hermes Release Radar History</span>", history_html)
+            self.assertIn("<span>Hermes Release Radar</span>", history_html)
+            # Same topbar layout as the current page: brand links home + help icon.
             self.assertIn('class="brand" href="index.html"', history_html)
+            self.assertIn('class="help-icon"', history_html)
 
     def test_app_version_prefers_repo_version_over_stale_runtime_root(self) -> None:
         with tempfile.TemporaryDirectory(prefix="release-radar-version-badge-test-") as tmp:

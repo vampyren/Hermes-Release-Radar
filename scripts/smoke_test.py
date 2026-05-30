@@ -257,10 +257,37 @@ def check_generated_ui_contract(report: Reporter, temp_root: Path) -> None:
         report.fail("top nav cleanup + version badge", "; ".join(nav_problems))
     else:
         report.ok("top nav cleanup + version badge", "no Current link; History+help+brand+version badge intact")
+    # Helper buttons must give visible toast feedback (aligned to the app frame),
+    # and the redundant "Open service" link must be gone.
+    toast_problems = [
+        needle
+        for needle in (
+            'id="toastLayer"',
+            ".toast-layer{position:fixed",
+            "width:min(1180px,calc(100vw - 36px))",
+            "function showToast(",
+            "checkHelperStatus(true)",
+        )
+        if needle not in html_text
+    ]
+    # Note: the .openlink class is still used by "Open raw … commits" links, so
+    # check only for the removed "Open service" link text, not the shared class.
+    if ">Open service<" in html_text:
+        toast_problems.append('stale "Open service" link still present')
+    if toast_problems:
+        report.fail("helper toasts present + Open service removed", "; ".join(toast_problems))
+    else:
+        report.ok("helper toasts present + Open service removed", "frame-aligned toast layer + showToast wired; Open service gone")
     # History page must share the main page's outer frame/shell so navigating
     # between them feels seamless (same background gradient + content width).
     history_path = temp_root / "history.html"
-    shell_markers = ["radial-gradient(circle at 15% 0,#18342f 0,#0b1014 34rem)", "max-width:1180px"]
+    # Shared frame markers that must appear identically on both pages, including
+    # the shared h1 rhythm so the page heading lines up instead of jumping.
+    shell_markers = [
+        "radial-gradient(circle at 15% 0,#18342f 0,#0b1014 34rem)",
+        "max-width:1180px",
+        "h1{font-size:clamp(24px,6vw,32px);margin:0 0 4px}",
+    ]
     if not history_path.is_file():
         report.fail("history page shares main shell", "history.html not generated")
     else:
@@ -268,14 +295,22 @@ def check_generated_ui_contract(report: Reporter, temp_root: Path) -> None:
         shell_problems = [m for m in shell_markers if m not in html_text or m not in history_html]
         if "max-width:1100px" in history_html:
             shell_problems.append("history still uses divergent 1100px content width")
-        if '<a href="index.html">Current</a>' in history_html:
-            shell_problems.append('redundant "Current" link still on history page')
+        # Page toggle: history shows a "Current" link back to index.html and must
+        # not self-link to history.html (the current page shows "History (N)").
+        if '<a href="index.html">Current</a>' not in history_html:
+            shell_problems.append("history page-toggle 'Current' link to index.html missing")
+        if 'href="history.html"' in history_html:
+            shell_problems.append("history page should not self-link to history.html")
+        if "<span>Hermes Release Radar History</span>" in history_html:
+            shell_problems.append("history brand still shows the 'History' suffix instead of the unified brand")
         if 'class="brand" href="index.html"' not in history_html:
             shell_problems.append("history brand link back to index.html missing")
+        if 'class="help-icon"' not in history_html:
+            shell_problems.append("history help icon missing (topbar layout diverges from current page)")
         if shell_problems:
             report.fail("history page shares main shell", "; ".join(shell_problems))
         else:
-            report.ok("history page shares main shell", "same gradient + 1180px frame as the current page")
+            report.ok("history page shares main shell", "shared shell + h1 rhythm; nav toggles Current<->History; help on both")
 
 
 def check_runtime(report: Reporter, runtime_root: Path) -> None:
