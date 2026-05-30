@@ -4,6 +4,14 @@
 
 No unreleased changes.
 
+## 0.4.6-local - 2026-05-30
+
+- Removed the redundant `Current` link from the top navigation on both the current and history pages; the brand/logo/title still links back to `index.html`, so there is always a way back to the main page. The top nav is now just `History (N)` and the `?` help icon.
+- Added a discreet Release Radar app-version badge next to the brand in the top bar on both pages (small, muted, compact pill — no extra card or summary item).
+- Clarified that the badge is the Release Radar **app** version (read from the repo `VERSION` file, single source of truth), not the inspected Hermes Agent version shown in the page content; the badge carries a `Hermes Release Radar app version` tooltip to avoid confusion.
+- `generate.py` reads `VERSION` cleanly from either the repo checkout or the installed runtime, and the badge degrades gracefully (hidden) if no `VERSION` file is present. Runtime install/update now copies `VERSION` into `~/.hermes/release-radar/`; README, HELP.md, docs/help.html, and the smoke test runtime-file check were updated accordingly.
+- Safety: no `hermes update`, package install, force-push, destructive git operation (reset/stash/restore/clean), Hermes-checkout mutation, public helper exposure, or service restart was performed.
+
 ## 0.4.5-local - 2026-05-30
 
 - Migrated stale persisted baseline checkpoint labels so the "Current installed state" card no longer shows operational error text like `hermes command not found` after the installed-version fallback fix recovered the real version.

@@ -160,6 +160,22 @@ class BaselineLabelMigrationTests(unittest.TestCase):
 
             self.assertEqual(state["baseline_label"], "Hermes Agent v0.14.0 (2026.4.1)")
 
+    def test_app_version_prefers_repo_version_over_stale_runtime_root(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="release-radar-version-badge-test-") as tmp:
+            root = Path(tmp)
+            # Simulate a stale VERSION sitting in RELEASE_RADAR_ROOT.
+            (root / "VERSION").write_text("9.9.9-stale\n", encoding="utf-8")
+            generate = self.load_generate_with_root(root)
+
+            repo_version = (REPO_ROOT / "VERSION").read_text(encoding="utf-8").strip().splitlines()[0].strip()
+
+            # Running from repo src/generate.py must report the repo's own VERSION,
+            # not the stale RELEASE_RADAR_ROOT/VERSION.
+            self.assertEqual(generate.read_app_version(), repo_version)
+            self.assertNotEqual(generate.read_app_version(), "9.9.9-stale")
+            # The module-load constant (used to build the badge) reflects it too.
+            self.assertEqual(generate.APP_VERSION, repo_version)
+
     def test_archive_if_head_advanced_never_stores_invalid_raw_version(self) -> None:
         with tempfile.TemporaryDirectory(prefix="release-radar-archive-test-") as tmp:
             root = Path(tmp) / "runtime"
