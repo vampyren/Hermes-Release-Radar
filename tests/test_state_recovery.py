@@ -5,6 +5,7 @@ from __future__ import annotations
 import importlib
 import json
 import os
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -87,6 +88,101 @@ class StateRecoveryTests(unittest.TestCase):
                 os.environ["PATH"] = old_path
 
             self.assertEqual(output, "Hermes Agent v9.8.7 (2099.1.2)")
+
+
+class BaselineLabelMigrationTests(unittest.TestCase):
+    def load_generate_with_root(self, root: Path, hermes_repo: Path | None = None):
+        os.environ["RELEASE_RADAR_ROOT"] = str(root)
+        os.environ["RELEASE_RADAR_HERMES_REPO"] = str(hermes_repo or REPO_ROOT)
+        sys.modules.pop("generate", None)
+        return importlib.import_module("generate")
+
+    def make_git_repo(self, path: Path) -> tuple[str, str]:
+        """Create a tiny git repo with two commits; return (first, second) SHAs."""
+        path.mkdir(parents=True)
+        env = dict(os.environ, GIT_AUTHOR_NAME="t", GIT_AUTHOR_EMAIL="t@example.com", GIT_COMMITTER_NAME="t", GIT_COMMITTER_EMAIL="t@example.com")
+
+        def git(*args: str) -> str:
+            return subprocess.run(["git", *args], cwd=str(path), env=env, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, check=True).stdout.strip()
+
+        git("init", "-q")
+        (path / "a.txt").write_text("one\n", encoding="utf-8")
+        git("add", "a.txt")
+        git("commit", "-q", "-m", "first")
+        first = git("rev-parse", "HEAD")
+        (path / "a.txt").write_text("two\n", encoding="utf-8")
+        git("add", "a.txt")
+        git("commit", "-q", "-m", "second")
+        second = git("rev-parse", "HEAD")
+        return first, second
+
+    def test_is_valid_checkpoint_label_rejects_operational_errors(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="release-radar-label-test-") as tmp:
+            generate = self.load_generate_with_root(Path(tmp))
+            for bad in ["", "unknown", "hermes command not found", "Hermes CLI version unavailable", "Hermes checkout unavailable"]:
+                self.assertFalse(generate.is_valid_checkpoint_label(bad), bad)
+            for good in ["Hermes Agent v0.15.0 (2026.5.28)", "Checkpoint 680478a98750", "Initial Release Radar baseline"]:
+                self.assertTrue(generate.is_valid_checkpoint_label(good), good)
+
+    def test_migrate_repairs_bad_label_to_current_version_when_baseline_is_head(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="release-radar-migrate-test-") as tmp:
+            generate = self.load_generate_with_root(Path(tmp))
+            head = "680478a98750" + "0" * 28
+            state = {"baseline_commit": head, "baseline_label": "hermes command not found"}
+            data = {"head": head, "current_version": generate.parse_version("Hermes Agent v0.15.0 (2026.5.28)")}
+
+            generate.migrate_baseline_label(state, data)
+
+            self.assertEqual(state["baseline_label"], "Hermes Agent v0.15.0 (2026.5.28)")
+            self.assertEqual(state["baseline_commit"], head)
+
+    def test_migrate_repairs_bad_label_to_checkpoint_when_not_mappable(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="release-radar-migrate-test-") as tmp:
+            generate = self.load_generate_with_root(Path(tmp))
+            baseline = "680478a98750" + "0" * 28
+            head = "11d93096b39e" + "1" * 28
+            state = {"baseline_commit": baseline, "baseline_label": "hermes command not found"}
+            data = {"head": head, "current_version": generate.parse_version("Hermes Agent v0.15.0 (2026.5.28)")}
+
+            generate.migrate_baseline_label(state, data)
+
+            self.assertEqual(state["baseline_label"], "Checkpoint 680478a98750")
+            self.assertEqual(state["baseline_commit"], baseline)
+
+    def test_migrate_leaves_valid_label_untouched(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="release-radar-migrate-test-") as tmp:
+            generate = self.load_generate_with_root(Path(tmp))
+            head = "abc" + "0" * 37
+            state = {"baseline_commit": head, "baseline_label": "Hermes Agent v0.14.0 (2026.4.1)"}
+            data = {"head": head, "current_version": generate.parse_version("Hermes Agent v0.15.0 (2026.5.28)")}
+
+            generate.migrate_baseline_label(state, data)
+
+            self.assertEqual(state["baseline_label"], "Hermes Agent v0.14.0 (2026.4.1)")
+
+    def test_archive_if_head_advanced_never_stores_invalid_raw_version(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="release-radar-archive-test-") as tmp:
+            root = Path(tmp) / "runtime"
+            hermes_repo = Path(tmp) / "hermes-agent"
+            first, second = self.make_git_repo(hermes_repo)
+            generate = self.load_generate_with_root(root, hermes_repo)
+
+            state = {"baseline_commit": first, "baseline_label": "Hermes Agent v0.14.0 (2026.4.1)", "review_markers": [], "history": []}
+            data = {
+                "repo_ok": True,
+                "head": second,
+                "generated_at": "2026-05-30T00:00:00+00:00",
+                "current_version": generate.parse_version("hermes command not found"),
+                "latest_release": {},
+                "reachable_releases": [],
+            }
+
+            generate.archive_if_head_advanced(state, data)
+
+            self.assertEqual(state["baseline_commit"], second)
+            self.assertNotEqual(state["baseline_label"], "hermes command not found")
+            self.assertTrue(generate.is_valid_checkpoint_label(state["baseline_label"]))
+            self.assertEqual(state["baseline_label"], f"Checkpoint {second[:12]}")
 
 
 if __name__ == "__main__":
