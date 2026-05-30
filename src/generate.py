@@ -54,17 +54,28 @@ GIT_WARNINGS: list[str] = []
 def read_app_version() -> str:
     """Return the Release Radar app version (this tool's version, not Hermes Agent).
 
-    Reads the repo's VERSION file so the top-bar badge has a single source of
-    truth. Works for direct repo runs (VERSION sits one level above src/) and for
-    the installed runtime, where generate.py and a copied VERSION file live
-    together in RELEASE_RADAR_ROOT. Returns "" if no VERSION file is found so the
-    badge can degrade gracefully instead of showing a placeholder.
+    Reads the VERSION file so the top-bar badge has a single source of truth.
+    Candidates are ordered to prefer the VERSION file co-located with the running
+    code, so the badge reflects the version that actually generated the page:
+    1. here.parent/VERSION        — installed runtime (generate.py + VERSION live
+                                     together in RELEASE_RADAR_ROOT)
+    2. here.parent.parent/VERSION — direct repo run (VERSION sits above src/)
+    3. ROOT/VERSION               — fallback only
+    ROOT is last so a stale RELEASE_RADAR_ROOT/VERSION cannot shadow the repo
+    VERSION during a repo run. In the installed runtime here.parent == ROOT, so
+    those paths overlap; dedupe to avoid reading the same file twice. Returns ""
+    if no VERSION file is found so the badge degrades gracefully.
     """
     here = Path(__file__).resolve()
-    candidates = [ROOT / "VERSION", here.parent / "VERSION", here.parent.parent / "VERSION"]
+    candidates = [here.parent / "VERSION", here.parent.parent / "VERSION", ROOT / "VERSION"]
+    seen: set[Path] = set()
     for candidate in candidates:
+        resolved = candidate.resolve()
+        if resolved in seen:
+            continue
+        seen.add(resolved)
         try:
-            text = candidate.read_text(encoding="utf-8").strip()
+            text = resolved.read_text(encoding="utf-8").strip()
         except OSError:
             continue
         if text:
