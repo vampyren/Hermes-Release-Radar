@@ -289,6 +289,8 @@ def check_generated_ui_contract(report: Reporter, temp_root: Path) -> None:
     cat_problems = []
     if "function expandAllCats(" not in html_text or "function collapseAllCats(" not in html_text:
         cat_problems.append("expand/collapse-all JS missing")
+    if "function initCatToggle(" not in html_text:
+        cat_problems.append("category collapse-state persistence (initCatToggle) missing")
     if '<section id="cat-' in html_text:
         cat_problems.append("category cards still use <section> instead of <details>")
     if cat_problems:

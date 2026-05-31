@@ -8,6 +8,7 @@ No unreleased changes.
 
 - Each category in the Raw categorized commits tab is now individually collapsible, the same way the Review markers card works: every category is a native `<details>` with a rotating chevron, open by default, so you can collapse/expand a category on its own without affecting the others. Layout and the per-category `Mark reviewed` / `Show all` behavior are unchanged; the `Mark reviewed` button no longer toggles the card when clicked.
 - Added `Expand all` and `Collapse all` buttons (chevron icon + label) on the `Raw categorized commits` heading row, aligned to the right within the content frame, to open or close every category at once. They affect only the Raw-tab category cards.
+- Each category's collapsed/expanded state is remembered locally (in the browser's `localStorage`) and restored on load, so a `Refresh from upstream` (or any page reload) keeps your collapse state instead of re-expanding everything. Categories you have never touched keep the open-by-default.
 - No behavioral change to release detection, review markers, or history. Release Radar still never runs `hermes update` and does not mutate the Hermes checkout.
 
 ## 0.4.9-local - 2026-05-30
