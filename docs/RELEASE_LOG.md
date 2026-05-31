@@ -4,6 +4,13 @@
 
 No unreleased changes.
 
+## 0.4.10-local - 2026-05-31
+
+- Each category in the Raw categorized commits tab is now individually collapsible, the same way the Review markers card works: every category is a native `<details>` with a rotating chevron, open by default, so you can collapse/expand a category on its own without affecting the others. The `<summary>` toggle contains only the category title (no nested interactive controls), and the `Mark reviewed` button is a separate sibling kept on the same header row — so clicking or keyboard-activating `Mark reviewed` saves the marker without toggling the category, and the category title toggles independently. The per-category `Show all` behavior is unchanged. (`Mark reviewed` shows while a category is expanded; collapsing a category hides its actions along with its commits.)
+- Added `Expand all` and `Collapse all` buttons (chevron icon + label) on the `Raw categorized commits` heading row, aligned to the right within the content frame, to open or close every category at once. They affect only the Raw-tab category cards.
+- Each category's collapsed/expanded state is remembered locally (in the browser's `localStorage`) and restored on load, so a `Refresh from upstream` (or any page reload) keeps your collapse state instead of re-expanding everything. Categories you have never touched keep the open-by-default.
+- No behavioral change to release detection, review markers, or history. Release Radar still never runs `hermes update` and does not mutate the Hermes checkout.
+
 ## 0.4.9-local - 2026-05-30
 
 - Fixed the History page showing operational error text such as `hermes command not found -> hermes command not found` as installed-update titles. Those came from archive records written before the baseline-label fix (v0.4.5-local), when version detection was failing; the bad text was stored durably in `history[].from_version` / `to_version`.

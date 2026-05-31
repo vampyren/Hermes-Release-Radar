@@ -285,6 +285,18 @@ def check_generated_ui_contract(report: Reporter, temp_root: Path) -> None:
         report.fail("helper toasts present + Open service removed", "; ".join(toast_problems))
     else:
         report.ok("helper toasts present + Open service removed", "frame-aligned toast layer + showToast wired; Open service gone")
+    # Per-category expand/collapse: cards must be <details>, with the bulk JS present.
+    cat_problems = []
+    if "function expandAllCats(" not in html_text or "function collapseAllCats(" not in html_text:
+        cat_problems.append("expand/collapse-all JS missing")
+    if "function initCatToggle(" not in html_text:
+        cat_problems.append("category collapse-state persistence (initCatToggle) missing")
+    if '<section id="cat-' in html_text:
+        cat_problems.append("category cards still use <section> instead of <details>")
+    if cat_problems:
+        report.fail("category expand/collapse controls", "; ".join(cat_problems))
+    else:
+        report.ok("category expand/collapse controls", "per-category <details> + expand/collapse-all JS present")
     # History page must share the main page's outer frame/shell so navigating
     # between them feels seamless (same background gradient + content width).
     history_path = temp_root / "history.html"
