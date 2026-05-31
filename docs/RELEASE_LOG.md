@@ -10,6 +10,7 @@ No unreleased changes.
 - Added a safe history migration (`migrate_history_version_labels`) that repairs only invalid history labels: it derives the real version from each record's baseline commit by reading `hermes_cli/__init__.py` at that commit with a read-only `git show` (never checking out or mutating the Hermes repo), and falls back to a neutral `Checkpoint <shortsha>` when a version cannot be reliably derived. Valid labels, commits, baselines, counts, dates, releases, and archived review markers are left untouched, and no history entries are added, removed, or reordered.
 - Added a defensive render-side fallback so `render_history()` never displays operational error text even if a record has not been (or cannot be) repaired — it shows `Checkpoint <shortsha>` instead.
 - The current installed records that previously showed `hermes command not found` map reliably to `Hermes Agent v0.14.0 (2026.5.16)` from the checkout metadata at their baseline commits.
+- Removed the redundant `Use <date>` button from the Review-markers controls: it only pre-filled the label input with today's date, which `Mark all categories reviewed` already uses by default when the label is empty. The remaining `Mark all categories reviewed` and `Clear all markers` buttons fill its place. Marker labelling behavior is otherwise unchanged.
 - Review-marker pruning behavior from v0.4.8-local is unchanged. Release Radar still never runs `hermes update` and does not mutate the Hermes checkout (read-only git inspection only).
 
 ## 0.4.8-local - 2026-05-30
