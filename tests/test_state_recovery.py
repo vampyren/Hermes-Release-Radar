@@ -322,6 +322,110 @@ class BaselineLabelMigrationTests(unittest.TestCase):
             self.assertEqual(state["review_markers"], [])
             self.assertEqual(state["history"][-1]["review_markers_archived"], existing_markers)
 
+    def make_versioned_git_repo(self, path: Path, versions):
+        """Create a git repo with one commit per (version, date), writing
+        hermes_cli/__init__.py each time. Returns the list of commit SHAs."""
+        path.mkdir(parents=True)
+        env = dict(os.environ, GIT_AUTHOR_NAME="t", GIT_AUTHOR_EMAIL="t@example.com", GIT_COMMITTER_NAME="t", GIT_COMMITTER_EMAIL="t@example.com")
+
+        def git(*args: str) -> str:
+            return subprocess.run(["git", *args], cwd=str(path), env=env, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, check=True).stdout.strip()
+
+        git("init", "-q")
+        (path / "hermes_cli").mkdir()
+        shas = []
+        for ver, date in versions:
+            (path / "hermes_cli" / "__init__.py").write_text(f'__version__ = "{ver}"\n__release_date__ = "{date}"\n', encoding="utf-8")
+            git("add", "-A")
+            git("commit", "-q", "-m", f"release {ver}")
+            shas.append(git("rev-parse", "HEAD"))
+        return shas
+
+    def test_migrate_history_repairs_invalid_labels_from_commit_metadata(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="release-radar-histlabel-test-") as tmp:
+            hermes = Path(tmp) / "hermes-agent"
+            sha_a, sha_b = self.make_versioned_git_repo(hermes, [("0.14.0", "2026.5.16"), ("0.15.0", "2026.5.28")])
+            generate = self.load_generate_with_root(Path(tmp) / "runtime", hermes)
+            state = {"history": [{
+                "from_version": "hermes command not found", "to_version": "hermes command not found",
+                "old_baseline": sha_a, "new_baseline": sha_b, "commit_count": 5, "commits": [{"short": "x"}],
+            }]}
+
+            generate.migrate_history_version_labels(state, {"repo_ok": True})
+
+            self.assertEqual(state["history"][0]["from_version"], "Hermes Agent v0.14.0 (2026.5.16)")
+            self.assertEqual(state["history"][0]["to_version"], "Hermes Agent v0.15.0 (2026.5.28)")
+            # Other fields and the entry itself are preserved.
+            self.assertEqual(state["history"][0]["commit_count"], 5)
+            self.assertEqual(state["history"][0]["commits"], [{"short": "x"}])
+            self.assertEqual(len(state["history"]), 1)
+
+    def test_migrate_history_leaves_underivable_labels_for_render_fallback(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="release-radar-histlabel-test-") as tmp:
+            hermes = Path(tmp) / "hermes-agent"
+            self.make_versioned_git_repo(hermes, [("0.14.0", "2026.5.16")])
+            generate = self.load_generate_with_root(Path(tmp) / "runtime", hermes)
+            missing = "d" * 40
+            state = {"history": [{"from_version": "unknown", "to_version": "hermes command not found",
+                                  "old_baseline": missing, "new_baseline": missing,
+                                  "commit_count": 2, "commits": [], "category_counts": {}, "releases": []}]}
+
+            generate.migrate_history_version_labels(state, {"repo_ok": True})
+
+            # Not derivable -> durable labels left untouched (no casual rewrite of history).
+            self.assertEqual(state["history"][0]["from_version"], "unknown")
+            self.assertEqual(state["history"][0]["to_version"], "hermes command not found")
+            # ...but render shows a neutral checkpoint and never the operational text.
+            html_out = generate.render_history(state)
+            self.assertNotIn("hermes command not found", html_out)
+            self.assertIn(f"Checkpoint {missing[:12]}", html_out)
+
+    def test_migrate_history_leaves_valid_labels_unchanged(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="release-radar-histlabel-test-") as tmp:
+            hermes = Path(tmp) / "hermes-agent"
+            sha_a, sha_b = self.make_versioned_git_repo(hermes, [("0.14.0", "2026.5.16"), ("0.15.0", "2026.5.28")])
+            generate = self.load_generate_with_root(Path(tmp) / "runtime", hermes)
+            # Stored labels are valid but deliberately different from what the commits would derive.
+            state = {"history": [{"from_version": "Hermes Agent v0.13.0 (2026.5.7)", "to_version": "Hermes Agent v0.14.0 (2026.5.16)",
+                                  "old_baseline": sha_a, "new_baseline": sha_b}]}
+
+            generate.migrate_history_version_labels(state, {"repo_ok": True})
+
+            self.assertEqual(state["history"][0]["from_version"], "Hermes Agent v0.13.0 (2026.5.7)")
+            self.assertEqual(state["history"][0]["to_version"], "Hermes Agent v0.14.0 (2026.5.16)")
+
+    def test_migrate_history_skips_and_preserves_when_repo_not_ok(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="release-radar-histlabel-test-") as tmp:
+            generate = self.load_generate_with_root(Path(tmp))
+            original = [{"from_version": "hermes command not found", "to_version": "unknown",
+                         "old_baseline": "a" * 40, "new_baseline": "b" * 40, "commit_count": 3}]
+            state = {"history": [dict(original[0])]}
+
+            generate.migrate_history_version_labels(state, {"repo_ok": False})
+
+            self.assertEqual(state["history"], original)  # not derived/rewritten when checkout unreadable
+
+    def test_render_history_never_shows_operational_error_text(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="release-radar-histlabel-test-") as tmp:
+            generate = self.load_generate_with_root(Path(tmp))
+            bad = generate.render_history({"history": [{
+                "from_version": "hermes command not found", "to_version": "unavailable",
+                "old_baseline": "1e71b7180e5b" + "0" * 28, "new_baseline": "680478a98750" + "0" * 28,
+                "commit_count": 5, "commits": [], "category_counts": {}, "releases": [],
+            }]})
+            self.assertNotIn("hermes command not found", bad)
+            self.assertNotIn("unavailable", bad)
+            self.assertIn("Checkpoint 1e71b7180e5b", bad)
+            self.assertIn("Checkpoint 680478a98750", bad)
+
+            good = generate.render_history({"history": [{
+                "from_version": "Hermes Agent v0.14.0 (2026.5.16)", "to_version": "Hermes Agent v0.15.0 (2026.5.28)",
+                "old_baseline": "a" * 40, "new_baseline": "b" * 40,
+                "commit_count": 1, "commits": [], "category_counts": {}, "releases": [],
+            }]})
+            self.assertIn("Hermes Agent v0.14.0 (2026.5.16)", good)
+            self.assertIn("Hermes Agent v0.15.0 (2026.5.28)", good)
+
 
 if __name__ == "__main__":
     unittest.main()

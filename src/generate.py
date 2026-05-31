@@ -288,6 +288,19 @@ def migrate_baseline_label(state: dict[str, Any], data: dict[str, Any]) -> None:
         state["baseline_label"] = f"Checkpoint {baseline[:12]}"
 
 
+def _init_version_label(text: str) -> str:
+    """Build a 'Hermes Agent v<v> (<d>)' label from hermes_cli/__init__.py contents, or ''."""
+    version_match = re.search(r'^__version__\s*=\s*["\']([^"\']+)["\']', text, re.MULTILINE)
+    if not version_match:
+        return ""
+    date_match = re.search(r'^__release_date__\s*=\s*["\']([^"\']+)["\']', text, re.MULTILINE)
+    version = version_match.group(1).strip()
+    date = date_match.group(1).strip() if date_match else "local source"
+    if not version.startswith("v"):
+        version = f"v{version}"
+    return f"Hermes Agent {version} ({date})"
+
+
 def local_source_version_output() -> str:
     """Read the inspected Hermes checkout version without importing or executing it."""
     init_path = REPO / "hermes_cli" / "__init__.py"
@@ -295,15 +308,25 @@ def local_source_version_output() -> str:
         text = init_path.read_text(encoding="utf-8")
     except OSError:
         return ""
-    version_match = re.search(r'^__version__\s*=\s*["\']([^"\']+)["\']', text, re.MULTILINE)
-    date_match = re.search(r'^__release_date__\s*=\s*["\']([^"\']+)["\']', text, re.MULTILINE)
-    if not version_match:
+    return _init_version_label(text)
+
+
+def version_label_at_commit(commit: str) -> str:
+    """Read the Hermes version recorded at a specific commit, read-only.
+
+    Uses `git show <commit>:hermes_cli/__init__.py` against the inspected checkout —
+    it never checks out, fetches, or otherwise mutates the Hermes repo. Returns a
+    valid 'Hermes Agent v<v> (<d>)' label, or '' when the commit/file is missing or
+    the metadata does not parse into a valid version (so callers can fall back to a
+    neutral checkpoint label instead of guessing).
+    """
+    if not commit:
         return ""
-    version = version_match.group(1).strip()
-    date = date_match.group(1).strip() if date_match else "local source"
-    if not version.startswith("v"):
-        version = f"v{version}"
-    return f"Hermes Agent {version} ({date})"
+    out = sh(["git", "show", f"{commit}:hermes_cli/__init__.py"], check=False)
+    if not out or out.lower().startswith("fatal:") or "command not found" in out.lower():
+        return ""
+    label = _init_version_label(out)
+    return label if is_valid_checkpoint_label(label) else ""
 
 
 def resolve_version_output() -> str:
@@ -864,8 +887,8 @@ def render_release_notes(data: dict[str, Any]) -> str:
         f'<div id="impactGrid" class="release-grid matter-grid">{"".join(cards_html)}</div>'
     )
 
-def render_markers_section(data: dict[str, Any], today_sv: str) -> str:
-    return f'''<section class="card"><details><summary><h2>Review markers</h2><span class="muted">Hidden by default · use Mark all most of the time</span></summary><p class="muted">Server-side <code>state.json</code> is canonical. With the helper service online, marker buttons save to disk and regenerate this page.</p><div class="marker-controls"><input id="markerLabel" placeholder="Optional marker label"><button class="date-chip" title="Use today as marker label" onclick="useTodayLabel()">Use {today_sv}</button><button onclick="markAllCategories()">Mark all categories reviewed</button><button class="danger" onclick="clearMarkers()">Clear all markers</button></div><div id="topMarkerLine" class="section-marker" data-marker-slot="top"></div><div id="markers"></div><p id="newSince" class="muted"></p></details></section>'''
+def render_markers_section(data: dict[str, Any]) -> str:
+    return f'''<section class="card"><details><summary><h2>Review markers</h2><span class="muted">Hidden by default · use Mark all most of the time</span></summary><p class="muted">Server-side <code>state.json</code> is canonical. With the helper service online, marker buttons save to disk and regenerate this page.</p><div class="marker-controls"><input id="markerLabel" placeholder="Optional marker label"><button onclick="markAllCategories()">Mark all categories reviewed</button><button class="danger" onclick="clearMarkers()">Clear all markers</button></div><div id="topMarkerLine" class="section-marker" data-marker-slot="top"></div><div id="markers"></div><p id="newSince" class="muted"></p></details></section>'''
 
 
 def render_page(data: dict[str, Any], state: dict[str, Any]) -> str:
@@ -977,7 +1000,7 @@ h2{{margin:20px 0 9px}} h3{{margin:0}} pre{{white-space:pre-wrap;overflow-wrap:a
 <section class="card jump-overview"><h2>Jump to category</h2><details class="matters-context"><summary>Show raw-category context</summary><p class="muted">Raw commit groups are here for auditability. <b>{data['behind']}</b> unique pending commit(s) are in the current <code>HEAD..origin/main</code> range. Category numbers below use each commit’s primary category, so the visible category total matches the unique pending count.</p></details><div class="jumpgrid">{cat_nav}</div></section>
 {safety_note}
 {git_warnings}
-{render_markers_section(data, today_sv)}
+{render_markers_section(data)}
 <section class="card"><h2>Current installed state</h2><pre>{html.escape(data['version_output'])}\n{html.escape(data['status'])}</pre><p>Baseline checkpoint: <code>{html.escape(state.get('baseline_commit','')[:12])}</code> — {html.escape(state.get('baseline_label',''))}</p></section>
 <h2>Raw categorized commits</h2>{cat_cards}
 <h2>Recent upstream commits</h2><p class="muted">Showing the newest {len(data['recent_commits'])} commits from HEAD..origin/main.</p>{commits}
@@ -1009,7 +1032,6 @@ function flushPendingToast() {{ try {{ const raw = sessionStorage.getItem('rrToa
 function setHelperStatus(ok, detail) {{ helperOnline = !!ok; const badge = document.getElementById('helperStatus'); const text = document.getElementById('helperDetail'); if (badge) {{ badge.className = `status-badge ${{ok ? 'online' : 'offline'}}`; badge.textContent = ok ? 'Online' : 'Offline'; }} if (text) text.textContent = detail || (ok ? 'Helper is online.' : 'Helper is offline.'); }}
 async function checkHelperStatus(fromClick) {{ try {{ const res = await fetch(`${{HELPER}}/api/status`, {{cache:'no-store'}}); const payload = await res.json(); if (!res.ok || !payload.ok) throw new Error(payload.error || 'status failed'); setHelperStatus(true, `Online · markers: ${{payload.marker_count}} · last generated: ${{payload.last_generated_at || 'unknown'}} · ${{payload.index_path}}`); if (fromClick) showToast(`Helper online · ${{payload.marker_count}} marker(s) · last generated ${{payload.last_generated_at || 'unknown'}}`, 'ok'); }} catch (err) {{ setHelperStatus(false, 'Offline. Refresh and durable marker saves need hermes-release-radar.service running.'); if (fromClick) showToast('Helper offline — start hermes-release-radar.service to enable Refresh and durable marker saves.', 'err'); }} }}
 function addMarker(label, commit, targetId) {{ const input = document.getElementById('markerLabel'); const finalLabel = (input && input.value.trim()) || label || 'Reviewed marker'; const target = targetId || 'top'; const ms = getMarkers().filter(m => (m.target_id || 'top') !== target); ms.unshift({{ id: (crypto.randomUUID ? crypto.randomUUID() : String(Date.now())), label: finalLabel, commit, target_id: target, created_at: new Date().toISOString() }}); if (input) input.value = ''; saveMarkers(ms, 'Review marker saved'); }}
-function useTodayLabel() {{ const input = document.getElementById('markerLabel'); if (input) input.value = TODAY_LABEL; }}
 function markAllCategories() {{ const input = document.getElementById('markerLabel'); const labelText = (input && input.value.trim()) || TODAY_LABEL; const suffix = labelText ? ` — ${{labelText}}` : ''; const existing = getMarkers().filter(m => !CATEGORY_TARGETS.some(c => c.id === (m.target_id || 'top'))); const now = new Date().toISOString(); const added = CATEGORY_TARGETS.map(c => ({{ id: (crypto.randomUUID ? crypto.randomUUID() : `${{Date.now()}}-${{c.id}}`), label: `${{c.label}} reviewed${{suffix}}`, commit: c.commit, target_id: c.id, created_at: now }})); if (input) input.value = ''; saveMarkers([...added, ...existing], 'All categories marked reviewed'); }}
 function deleteMarker(id) {{ saveMarkers(getMarkers().filter(m => m.id !== id), 'Marker cleared'); }}
 function clearMarkers() {{ if (confirm('Clear all review markers for this page?')) saveMarkers([], 'All review markers cleared'); }}
@@ -1039,7 +1061,9 @@ def render_history(state: dict[str, Any]) -> str:
             rels = h.get("releases", [])
             rel_html = "".join(f'<li><a href="{html.escape(r.get("html_url", "#"))}">{html.escape(r.get("name") or r.get("tag_name") or "release")}</a></li>' for r in rels) or "<li>No official release tag detected inside this installed range.</li>"
             top_commits = "".join(f'<li><code>{html.escape(c.get("short",""))}</code> {html.escape(c.get("subject",""))}</li>' for c in h.get("commits", [])[:25])
-            cards.append(f'''<section class="card"><h2>{html.escape(h.get('from_version','unknown'))} → {html.escape(h.get('to_version','unknown'))}</h2><p class="muted">Archived {html.escape(h.get('archived_at',''))} · {h.get('commit_count',0)} installed commits · <code>{html.escape(h.get('old_baseline','')[:12])}</code> → <code>{html.escape(h.get('new_baseline','')[:12])}</code></p><details open><summary>Official releases in this installed range</summary><ul>{rel_html}</ul></details><p><b>Category mix:</b> {cat_text or 'none'}</p><details><summary>Top installed commits</summary><ul>{top_commits}</ul></details></section>''')
+            from_label = history_display_label(h.get('from_version', ''), h.get('old_baseline', ''))
+            to_label = history_display_label(h.get('to_version', ''), h.get('new_baseline', ''))
+            cards.append(f'''<section class="card"><h2>{html.escape(from_label)} → {html.escape(to_label)}</h2><p class="muted">Archived {html.escape(h.get('archived_at',''))} · {h.get('commit_count',0)} installed commits · <code>{html.escape(h.get('old_baseline','')[:12])}</code> → <code>{html.escape(h.get('new_baseline','')[:12])}</code></p><details open><summary>Official releases in this installed range</summary><ul>{rel_html}</ul></details><p><b>Category mix:</b> {cat_text or 'none'}</p><details><summary>Top installed commits</summary><ul>{top_commits}</ul></details></section>''')
         body = "\n".join(cards)
     return f'''<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>Hermes Release Radar History</title><link rel="icon" type="image/svg+xml" href="data:image/svg+xml,{FAVICON_DATA}"><style>{SHELL_CSS}</style></head><body><div class="topbar"><main class="row spread"><span class="brandwrap"><a class="brand" href="index.html" aria-label="Hermes Release Radar home">{APP_ICON_SVG}<span>Hermes Release Radar</span></a>{APP_VERSION_BADGE}</span><span class="navlinks"><a href="index.html">Current</a><a class="help-icon" href="help.html" title="Help / setup commands" aria-label="Help / setup commands">?</a></span></main></div><main><h1>Installed update history</h1><p class="muted">This is the archive of commits that became installed checkpoints. It is separate from review markers.</p>{body}</main></body></html>'''
 
@@ -1080,6 +1104,42 @@ def archive_if_head_advanced(state: dict[str, Any], data: dict[str, Any]) -> Non
         state["checkpoint_notice"] = f"Archived {len(commits)} installed commits into history and moved baseline to {head[:12]}."
     else:
         state["checkpoint_warning"] = f"Stored baseline {baseline[:12]} is not an ancestor of current HEAD {head[:12]}; not auto-archiving. Manual checkpoint review needed."
+
+
+def history_display_label(label: str, commit: str) -> str:
+    """Render-safe history label: the stored label if valid, else a neutral checkpoint.
+
+    Defensive fallback so the History page never shows operational error text even
+    if a record has not been (or cannot be) repaired by migrate_history_version_labels.
+    """
+    if is_valid_checkpoint_label(label):
+        return label
+    return f"Checkpoint {commit[:12]}" if commit else "Checkpoint unknown"
+
+
+def migrate_history_version_labels(state: dict[str, Any], data: dict[str, Any]) -> None:
+    """Repair invalid version labels in archived installed-update history.
+
+    History records created before the baseline-label fix could persist operational
+    error text (e.g. "hermes command not found") as from_version/to_version. Repair
+    ONLY invalid labels: derive the real version from the record's baseline commit
+    via version_label_at_commit() (read-only) when possible, otherwise fall back to
+    "Checkpoint <shortsha>". Valid labels and every other field (commits, baselines,
+    counts, dates, releases, archived review markers) are left untouched, and no
+    records are added, removed, or reordered.
+    """
+    if not data.get("repo_ok", True):
+        return  # only derive labels when the checkout is readable
+    for record in state.get("history") or []:
+        for field, baseline_key in (("from_version", "old_baseline"), ("to_version", "new_baseline")):
+            if is_valid_checkpoint_label(record.get(field, "")):
+                continue  # keep valid labels exactly as stored
+            derived = version_label_at_commit(record.get(baseline_key) or "")
+            if derived:
+                record[field] = derived  # only durably rewrite when a real version is reliably derivable
+            # else: leave the stored label untouched; render_history shows a neutral
+            # Checkpoint <shortsha> at display time, so we never lose the chance to
+            # derive the real version later and never casually rewrite durable history.
 
 
 def prune_review_markers(state: dict[str, Any], data: dict[str, Any]) -> None:
@@ -1140,6 +1200,7 @@ def main():
     migrate_baseline_label(state, data)
     archive_if_head_advanced(state, data)
     prune_review_markers(state, data)
+    migrate_history_version_labels(state, data)
     state["last_generated_at"] = data["generated_at"]
     state["last_refresh_highlights"] = data.get("new_since_refresh", {})
     state["last_version_output"] = data.get("version_output", "")
