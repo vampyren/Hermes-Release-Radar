@@ -387,8 +387,43 @@ def merge_base(a: str, b: str) -> str:
     return out.splitlines()[-1].strip()
 
 
+def commit_exists(commit: str) -> bool:
+    """True only if the ref resolves to a real commit object in the checkout.
+
+    Read-only and fail-closed: a missing/garbage-collected/empty ref returns False.
+    """
+    if not commit:
+        return False
+    out = sh(["git", "rev-parse", "--verify", "--quiet", f"{commit}^{{commit}}"], check=False)
+    return bool(out.strip()) and "fatal" not in out.lower()
+
+
+def head_is_on_upstream_lineage(head: str, upstream: str) -> bool:
+    """Fail-closed trust check: True only if HEAD is on the origin/main lineage.
+
+    HEAD is trusted when it equals origin/main or is an ancestor of it. Any missing
+    ref, or a HEAD that has diverged onto a local branch/detached commit, returns
+    False so automatic history recovery is never attempted off untrusted lineage.
+    """
+    if not head or not upstream:
+        return False
+    if head == upstream:
+        return True
+    return is_ancestor(head, upstream)
+
+
 def rev_parse(ref: str) -> str:
     return sh(["git", "rev-parse", ref], check=False).splitlines()[-1].strip()
+
+
+# Canonical, neutral explanation rendered for every history gap card. Rendered from
+# this constant rather than a record's stored free-text note, so legacy records (which
+# may assert "Upstream history was rewritten" as fact) display the accurate wording too.
+GAP_EXPLANATION = (
+    "Stored Release Radar baseline diverged from the current trusted origin/main lineage. "
+    "This can happen after an upstream history rewrite or when an earlier checkpoint came "
+    "from another lineage. Exact intermediate installed checkpoints were not recorded."
+)
 
 
 def classify(files: list[str], subject: str):
@@ -1139,7 +1174,7 @@ def render_history(state: dict[str, Any]) -> str:
             if h.get("kind") == "gap":
                 mb = h.get("merge_base", "")
                 mb_html = f' · nearest common ancestor <code>{html.escape(mb[:12])}</code>' if mb else ""
-                cards.append(f'''<section class="card warn"><h2>History gap · {html.escape(from_label)} → {html.escape(to_label)}</h2><p class="muted">Recorded {html.escape(h.get('archived_at',''))} · ~{h.get('commit_count',0)} commits (approximate) · <code>{html.escape(h.get('old_baseline','')[:12])}</code> → <code>{html.escape(h.get('new_baseline','')[:12])}</code>{mb_html}</p><p>{html.escape(h.get('note',''))}</p><details open><summary>Official releases in the recovered range</summary><ul>{rel_html}</ul></details><p><b>Category mix (approximate):</b> {cat_text or 'none'}</p><details><summary>Sample commits in the recovered range</summary><ul>{top_commits}</ul></details></section>''')
+                cards.append(f'''<section class="card warn"><h2>History gap · {html.escape(from_label)} → {html.escape(to_label)}</h2><p class="muted">Recorded {html.escape(h.get('archived_at',''))} · ~{h.get('commit_count',0)} commits (approximate) · <code>{html.escape(h.get('old_baseline','')[:12])}</code> → <code>{html.escape(h.get('new_baseline','')[:12])}</code>{mb_html}</p><p>{html.escape(GAP_EXPLANATION)}</p><details open><summary>Official releases in the recovered range</summary><ul>{rel_html}</ul></details><p><b>Category mix (approximate):</b> {cat_text or 'none'}</p><details><summary>Sample commits in the recovered range</summary><ul>{top_commits}</ul></details></section>''')
                 continue
             cards.append(f'''<section class="card"><h2>{html.escape(from_label)} → {html.escape(to_label)}</h2><p class="muted">Archived {html.escape(h.get('archived_at',''))} · {h.get('commit_count',0)} installed commits · <code>{html.escape(h.get('old_baseline','')[:12])}</code> → <code>{html.escape(h.get('new_baseline','')[:12])}</code></p><details open><summary>Official releases in this installed range</summary><ul>{rel_html}</ul></details><p><b>Category mix:</b> {cat_text or 'none'}</p><details><summary>Top installed commits</summary><ul>{top_commits}</ul></details></section>''')
         body = warn_banner + "\n".join(cards)
@@ -1189,29 +1224,70 @@ def archive_if_head_advanced(state: dict[str, Any], data: dict[str, Any]) -> Non
             f"(possible Hermes rollback); not auto-archiving. Manual checkpoint review needed."
         )
     else:
-        # Divergence: the stored baseline is no longer on HEAD's line — upstream history
-        # was rewritten (squash/rebase). Record an honest, durable gap covering what we
-        # can know, then recover the baseline so future updates archive normally again.
-        record_history_gap(state, data, baseline, head)
+        # Non-ancestor in both directions. Recover ONLY on verified trusted-lineage
+        # divergence; every other untrusted state warns without mutating history.
+        attempt_history_gap_recovery(state, data, baseline, head)
 
 
-def record_history_gap(state: dict[str, Any], data: dict[str, Any], baseline: str, head: str) -> None:
-    """Append a durable 'gap' history record after an upstream history rewrite.
+def attempt_history_gap_recovery(state: dict[str, Any], data: dict[str, Any], baseline: str, head: str) -> None:
+    """Gate automatic gap recovery behind read-only, fail-closed trust checks.
 
-    When the stored baseline diverged from HEAD, the individual installed checkpoints
-    between them cannot be reconstructed faithfully. Instead of silently freezing
-    history (the old behavior) or inventing intermediate versions, we record one
-    clearly-labelled gap covering ``merge-base(baseline, head)..head`` — counts are
-    approximate, version labels are only used when reliably derivable — and advance
-    the baseline to HEAD so the next real update archives normally. Existing history
-    is never deleted. Read-only git inspection; the Hermes checkout is not mutated.
+    Reached only when baseline and HEAD are non-ancestors of each other (genuine
+    divergence). A durable gap is recorded — clearing markers and advancing the
+    baseline — ONLY when every trust condition holds: both commits resolve, HEAD is
+    on the trusted origin/main lineage, and a real merge-base exists. If any check
+    fails we set a specific checkpoint_warning and leave history, baseline, and
+    markers untouched. Never mutates the Hermes checkout.
     """
+    upstream = data.get("upstream") or ""
+    if not commit_exists(baseline):
+        state["checkpoint_warning"] = (
+            f"Stored Release Radar baseline {baseline[:12] or '(empty)'} could not be resolved in the Hermes "
+            f"checkout (missing or garbage-collected); skipping automatic history recovery. No history was changed."
+        )
+        return
+    if not commit_exists(head):
+        state["checkpoint_warning"] = (
+            f"Current HEAD {head[:12] or '(empty)'} could not be resolved in the Hermes checkout; "
+            f"skipping automatic history recovery. No history was changed."
+        )
+        return
+    if not commit_exists(upstream):
+        state["checkpoint_warning"] = (
+            "Could not resolve a trusted origin/main to verify the current HEAD's lineage; "
+            "skipping automatic history recovery. No history was changed."
+        )
+        return
+    if not head_is_on_upstream_lineage(head, upstream):
+        state["checkpoint_warning"] = (
+            f"Current HEAD {head[:12]} is not on the trusted origin/main lineage "
+            f"(e.g. a local feature branch or detached commit); skipping automatic history recovery. "
+            f"No history was changed."
+        )
+        return
     mb = merge_base(baseline, head)
-    if mb:
-        commits, cat_counts, imp_counts, _category_commits = collect_commits(f"{mb}..{head}")
-        releases = releases_between([data.get("latest_release", {})] + data.get("reachable_releases", []), mb, head)
-    else:
-        commits, cat_counts, imp_counts, releases = [], {}, {}, []
+    if not mb:
+        state["checkpoint_warning"] = (
+            f"No common ancestor between stored baseline {baseline[:12]} and current HEAD {head[:12]} "
+            f"(unrelated histories); skipping automatic history recovery. No history was changed."
+        )
+        return
+    record_history_gap(state, data, baseline, head, mb)
+
+
+def record_history_gap(state: dict[str, Any], data: dict[str, Any], baseline: str, head: str, mb: str) -> None:
+    """Append a durable 'gap' record for a verified trusted-lineage divergence.
+
+    Callers (attempt_history_gap_recovery) must have already verified every trust
+    condition, including a non-empty merge-base ``mb``. The individual installed
+    checkpoints between baseline and HEAD cannot be reconstructed faithfully, so we
+    record one clearly-labelled gap covering ``mb..head`` — counts approximate,
+    version labels only when reliably derivable — and advance the baseline to HEAD so
+    the next real update archives normally. Existing history is never deleted.
+    Read-only git inspection; the Hermes checkout is not mutated.
+    """
+    commits, cat_counts, imp_counts, _category_commits = collect_commits(f"{mb}..{head}")
+    releases = releases_between([data.get("latest_release", {})] + data.get("reachable_releases", []), mb, head)
     new_version = data.get("current_version", {})
     # from_version: prefer the real version at the diverged baseline; fall back to the
     # stored label only if it is valid; otherwise a neutral checkpoint. Never invented.
@@ -1237,20 +1313,15 @@ def record_history_gap(state: dict[str, Any], data: dict[str, Any], baseline: st
         "releases": releases,
         "commits": [{k: c[k] for k in ["short", "full", "date", "subject", "importance", "categories"]} for c in commits[:50]],
         "review_markers_archived": state.get("review_markers", []),
-        "note": (
-            "Upstream history was rewritten: the previously recorded baseline is no longer an "
-            "ancestor of the current HEAD, so the individual installed checkpoints between them "
-            "were not captured. This is a recovered range from the nearest common ancestor; the "
-            "commit count is approximate and intermediate version checkpoints are not individually recorded."
-        ),
+        "note": GAP_EXPLANATION,
     }
     state.setdefault("history", []).append(record)
     state["baseline_commit"] = head
     state["baseline_label"] = checkpoint_label_for(new_version, head)
     state["review_markers"] = []
     state["checkpoint_notice"] = (
-        f"Recorded a history gap and recovered the baseline to {head[:12]} after an upstream "
-        f"history rewrite (~{len(commits)} commits in the recovered range)."
+        f"Recorded a history gap and recovered the baseline to {head[:12]} after the stored baseline "
+        f"diverged from the trusted origin/main lineage (~{len(commits)} commits in the recovered range)."
     )
     state.pop("checkpoint_warning", None)
 
