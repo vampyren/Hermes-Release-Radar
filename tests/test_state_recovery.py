@@ -426,6 +426,290 @@ class BaselineLabelMigrationTests(unittest.TestCase):
             self.assertIn("Hermes Agent v0.14.0 (2026.5.16)", good)
             self.assertIn("Hermes Agent v0.15.0 (2026.5.28)", good)
 
+    # ---- history gap detection / recovery (divergent upstream history) ----
+
+    def make_divergent_git_repo(self, path: Path) -> tuple[str, str, str]:
+        """Build a repo whose stored baseline is NOT an ancestor of HEAD.
+
+        Shape:  base ──A           (A = stale baseline on a side branch)
+                     └─B──C        (C = current HEAD on the main line)
+        merge-base(A, C) == base; A is not an ancestor of C and vice versa.
+        Returns (base, stale_baseline_A, head_C).
+        """
+        path.mkdir(parents=True)
+        env = dict(os.environ, GIT_AUTHOR_NAME="t", GIT_AUTHOR_EMAIL="t@example.com", GIT_COMMITTER_NAME="t", GIT_COMMITTER_EMAIL="t@example.com")
+
+        def git(*args: str) -> str:
+            return subprocess.run(["git", *args], cwd=str(path), env=env, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, check=True).stdout.strip()
+
+        git("init", "-q")
+        (path / "a.txt").write_text("base\n", encoding="utf-8")
+        git("add", "a.txt")
+        git("commit", "-q", "-m", "base")
+        base = git("rev-parse", "HEAD")
+        main_branch = git("rev-parse", "--abbrev-ref", "HEAD")
+        # side branch: the commit that becomes the stale (later rewritten-away) baseline
+        git("checkout", "-q", "-b", "side")
+        (path / "a.txt").write_text("stale\n", encoding="utf-8")
+        git("commit", "-q", "-am", "stale baseline A")
+        stale = git("rev-parse", "HEAD")
+        # main line advances independently to HEAD
+        git("checkout", "-q", main_branch)
+        (path / "a.txt").write_text("main-b\n", encoding="utf-8")
+        git("commit", "-q", "-am", "main B")
+        (path / "a.txt").write_text("main-c\n", encoding="utf-8")
+        git("commit", "-q", "-am", "main C")
+        head = git("rev-parse", "HEAD")
+        return base, stale, head
+
+    def test_divergent_baseline_records_gap_and_recovers_baseline(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="release-radar-gap-test-") as tmp:
+            root = Path(tmp) / "runtime"
+            hermes_repo = Path(tmp) / "hermes-agent"
+            base, stale, head = self.make_divergent_git_repo(hermes_repo)
+            generate = self.load_generate_with_root(root, hermes_repo)
+
+            prior = {"archived_at": "2026-05-23T00:00:00+00:00", "old_baseline": "x" * 40,
+                     "new_baseline": stale, "from_version": "Hermes Agent v0.13.0 (2026.5.7)",
+                     "to_version": "Hermes Agent v0.14.0 (2026.5.16)", "commit_count": 1,
+                     "commits": [], "category_counts": {}, "releases": []}
+            state = {"baseline_commit": stale, "baseline_label": "Hermes Agent v0.14.0 (2026.5.16)",
+                     "review_markers": [{"id": "m"}], "history": [prior],
+                     "checkpoint_warning": "stale warning from a prior run"}
+            # HEAD == origin/main => trusted lineage
+            data = {"repo_ok": True, "head": head, "upstream": head, "generated_at": "2026-06-21T00:00:00+00:00",
+                    "current_version": generate.parse_version("Hermes Agent v0.17.0 (2026.6.19)"),
+                    "latest_release": {}, "reachable_releases": []}
+
+            generate.archive_if_head_advanced(state, data)
+
+            # existing history preserved + one gap record appended
+            self.assertEqual(len(state["history"]), 2)
+            self.assertIs(state["history"][0], prior)
+            gap = state["history"][1]
+            self.assertEqual(gap.get("kind"), "gap")
+            self.assertEqual(gap["old_baseline"], stale)
+            self.assertEqual(gap["new_baseline"], head)
+            self.assertEqual(gap["merge_base"], base)
+            self.assertTrue(gap.get("commit_count_approximate"))
+            # baseline recovered so future updates archive normally again
+            self.assertEqual(state["baseline_commit"], head)
+            self.assertEqual(state["review_markers"], [])
+            # stale warning cleared; recovery notice set
+            self.assertNotIn("checkpoint_warning", state)
+            self.assertIn("gap", state.get("checkpoint_notice", "").lower())
+
+            # idempotent: a second run (baseline == head now) adds no duplicate gap
+            generate.archive_if_head_advanced(state, data)
+            self.assertEqual(len(state["history"]), 2)
+            self.assertEqual(state["baseline_commit"], head)
+
+    def test_divergent_gap_does_not_invent_version_labels(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="release-radar-gap-labels-") as tmp:
+            root = Path(tmp) / "runtime"
+            hermes_repo = Path(tmp) / "hermes-agent"
+            base, stale, head = self.make_divergent_git_repo(hermes_repo)
+            generate = self.load_generate_with_root(root, hermes_repo)
+            # no hermes_cli/__init__.py in these commits and no valid stored label =>
+            # nothing reliably derivable, so it must fall back to a neutral checkpoint
+            state = {"baseline_commit": stale, "baseline_label": "",
+                     "review_markers": [], "history": []}
+            data = {"repo_ok": True, "head": head, "upstream": head, "generated_at": "2026-06-21T00:00:00+00:00",
+                    "current_version": generate.parse_version("Hermes Agent v0.17.0 (2026.6.19)"),
+                    "latest_release": {}, "reachable_releases": []}
+
+            generate.archive_if_head_advanced(state, data)
+            gap = state["history"][-1]
+            # to_version is the real current version; from_version falls back to a neutral
+            # checkpoint (NOT an invented intermediate version)
+            self.assertEqual(gap["to_version"], "Hermes Agent v0.17.0 (2026.6.19)")
+            self.assertEqual(gap["from_version"], f"Checkpoint {stale[:12]}")
+            self.assertNotIn("v0.15", gap["from_version"])
+            self.assertNotIn("v0.16", gap["from_version"])
+
+    def test_head_behind_baseline_warns_and_does_not_fabricate(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="release-radar-rollback-") as tmp:
+            root = Path(tmp) / "runtime"
+            hermes_repo = Path(tmp) / "hermes-agent"
+            first, second = self.make_git_repo(hermes_repo)
+            generate = self.load_generate_with_root(root, hermes_repo)
+            # stored baseline is AHEAD of HEAD (rollback): second -> first
+            state = {"baseline_commit": second, "baseline_label": "Hermes Agent v0.17.0 (2026.6.19)",
+                     "review_markers": [], "history": []}
+            data = {"repo_ok": True, "head": first, "generated_at": "2026-06-21T00:00:00+00:00",
+                    "current_version": generate.parse_version("Hermes Agent v0.16.0 (2026.6.5)"),
+                    "latest_release": {}, "reachable_releases": []}
+
+            generate.archive_if_head_advanced(state, data)
+            # no gap fabricated, baseline untouched, warning set
+            self.assertEqual(state["history"], [])
+            self.assertEqual(state["baseline_commit"], second)
+            self.assertIn("behind", state.get("checkpoint_warning", "").lower())
+
+    def test_normal_ancestor_archive_has_no_gap_kind(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="release-radar-normal-arch-") as tmp:
+            root = Path(tmp) / "runtime"
+            hermes_repo = Path(tmp) / "hermes-agent"
+            first, second = self.make_git_repo(hermes_repo)
+            generate = self.load_generate_with_root(root, hermes_repo)
+            state = {"baseline_commit": first, "baseline_label": "Hermes Agent v0.16.0 (2026.6.5)",
+                     "review_markers": [], "history": []}
+            data = {"repo_ok": True, "head": second, "generated_at": "2026-06-21T00:00:00+00:00",
+                    "current_version": generate.parse_version("Hermes Agent v0.17.0 (2026.6.19)"),
+                    "latest_release": {}, "reachable_releases": []}
+
+            generate.archive_if_head_advanced(state, data)
+            self.assertEqual(len(state["history"]), 1)
+            self.assertNotEqual(state["history"][0].get("kind"), "gap")
+            self.assertEqual(state["baseline_commit"], second)
+
+    def test_render_history_gap_uses_neutral_wording_over_old_note(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="release-radar-gap-render-") as tmp:
+            generate = self.load_generate_with_root(Path(tmp))
+            out = generate.render_history({
+                "checkpoint_warning": "Current HEAD abc is behind stored baseline def (possible Hermes rollback); not auto-archiving.",
+                "history": [
+                    {  # legacy gap record carrying the OLD asserted-as-fact note
+                        "kind": "gap", "archived_at": "2026-06-21T00:00:00+00:00",
+                        "old_baseline": "a" * 40, "new_baseline": "b" * 40, "merge_base": "c" * 40,
+                        "from_version": "Checkpoint aaaaaaaaaaaa", "to_version": "Hermes Agent v0.17.0 (2026.6.19)",
+                        "commit_count": 3119, "commit_count_approximate": True,
+                        "commits": [], "category_counts": {}, "releases": [],
+                        "note": "Upstream history was rewritten: the previously recorded baseline ...",
+                    },
+                    {  # an ordinary old archive must still render unchanged
+                        "from_version": "Hermes Agent v0.13.0 (2026.5.7)", "to_version": "Hermes Agent v0.14.0 (2026.5.16)",
+                        "old_baseline": "d" * 40, "new_baseline": "e" * 40,
+                        "commit_count": 7, "commits": [], "category_counts": {}, "releases": [],
+                    },
+                ],
+            })
+            # gap card distinct + approximate
+            self.assertIn("History gap", out)
+            self.assertIn("3119", out)
+            self.assertIn("(approximate)", out)
+            # neutral canonical wording displayed; old asserted-as-fact note NOT displayed
+            self.assertIn("diverged from the current trusted origin/main lineage", out)
+            self.assertNotIn("Upstream history was rewritten", out)
+            # ordinary old record still renders; warning visible
+            self.assertIn("Hermes Agent v0.13.0 (2026.5.7)", out)
+            self.assertIn("possible Hermes rollback", out)
+
+    # ---- trust gating for automatic gap recovery (ChatGPT safety blocker) ----
+
+    def make_trust_repo(self, path: Path) -> dict:
+        """Build a repo with main lineage, a side branch, and an orphan history.
+
+            base ── A                 (side branch)
+                 └─ B ── C            (main line / origin/main tip)
+            (orphan root) O           (unrelated history, no merge-base with C)
+
+        Returns dict of SHAs: base, A, B, C, orphan, main_branch.
+        """
+        path.mkdir(parents=True)
+        env = dict(os.environ, GIT_AUTHOR_NAME="t", GIT_AUTHOR_EMAIL="t@example.com", GIT_COMMITTER_NAME="t", GIT_COMMITTER_EMAIL="t@example.com")
+
+        def git(*args: str) -> str:
+            return subprocess.run(["git", *args], cwd=str(path), env=env, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, check=True).stdout.strip()
+
+        git("init", "-q")
+        (path / "a.txt").write_text("base\n", encoding="utf-8")
+        git("add", "a.txt"); git("commit", "-q", "-m", "base")
+        base = git("rev-parse", "HEAD")
+        main_branch = git("rev-parse", "--abbrev-ref", "HEAD")
+        git("checkout", "-q", "-b", "side")
+        (path / "a.txt").write_text("side\n", encoding="utf-8"); git("commit", "-q", "-am", "A")
+        A = git("rev-parse", "HEAD")
+        git("checkout", "-q", main_branch)
+        (path / "a.txt").write_text("b\n", encoding="utf-8"); git("commit", "-q", "-am", "B")
+        B = git("rev-parse", "HEAD")
+        (path / "a.txt").write_text("c\n", encoding="utf-8"); git("commit", "-q", "-am", "C")
+        C = git("rev-parse", "HEAD")
+        git("checkout", "-q", "--orphan", "orphanb")
+        (path / "o.txt").write_text("orphan\n", encoding="utf-8")
+        git("add", "o.txt"); git("commit", "-q", "-m", "orphan root")
+        orphan = git("rev-parse", "HEAD")
+        git("checkout", "-q", main_branch)
+        return {"base": base, "A": A, "B": B, "C": C, "orphan": orphan, "main_branch": main_branch}
+
+    def _diverge_data(self, generate, head, upstream):
+        return {"repo_ok": True, "head": head, "upstream": upstream, "generated_at": "2026-06-21T00:00:00+00:00",
+                "current_version": generate.parse_version("Hermes Agent v0.17.0 (2026.6.19)"),
+                "latest_release": {}, "reachable_releases": []}
+
+    def _assert_no_recovery(self, state, before_baseline, before_markers, before_history_len, warn_substr):
+        # warn-only: nothing mutated
+        self.assertEqual(len(state["history"]), before_history_len)
+        self.assertEqual(state["baseline_commit"], before_baseline)
+        self.assertEqual(state["review_markers"], before_markers)
+        self.assertIn(warn_substr, state.get("checkpoint_warning", "").lower())
+
+    def test_head_not_on_origin_main_lineage_warns_only(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="release-radar-trust-branch-") as tmp:
+            r = self.make_trust_repo(Path(tmp) / "hermes-agent")
+            generate = self.load_generate_with_root(Path(tmp) / "runtime", Path(tmp) / "hermes-agent")
+            # baseline=B, HEAD=A (local side branch), origin/main=C
+            state = {"baseline_commit": r["B"], "baseline_label": "Hermes Agent v0.16.0 (2026.6.5)",
+                     "review_markers": [{"id": "m"}], "history": []}
+            generate.archive_if_head_advanced(state, self._diverge_data(generate, r["A"], r["C"]))
+            self._assert_no_recovery(state, r["B"], [{"id": "m"}], 0, "not on the trusted origin/main lineage")
+
+    def test_detached_local_commit_not_on_origin_main_warns_only(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="release-radar-trust-detached-") as tmp:
+            r = self.make_trust_repo(Path(tmp) / "hermes-agent")
+            generate = self.load_generate_with_root(Path(tmp) / "runtime", Path(tmp) / "hermes-agent")
+            # HEAD=A is a local commit not reachable from origin/main=C; baseline=C
+            state = {"baseline_commit": r["C"], "baseline_label": "Hermes Agent v0.17.0 (2026.6.19)",
+                     "review_markers": [], "history": []}
+            generate.archive_if_head_advanced(state, self._diverge_data(generate, r["A"], r["C"]))
+            self._assert_no_recovery(state, r["C"], [], 0, "not on the trusted origin/main lineage")
+
+    def test_missing_baseline_warns_only_no_count0_gap(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="release-radar-trust-missing-") as tmp:
+            r = self.make_trust_repo(Path(tmp) / "hermes-agent")
+            generate = self.load_generate_with_root(Path(tmp) / "runtime", Path(tmp) / "hermes-agent")
+            missing = "0" * 40
+            state = {"baseline_commit": missing, "baseline_label": "Hermes Agent v0.14.0 (2026.5.16)",
+                     "review_markers": [{"id": "m"}], "history": []}
+            generate.archive_if_head_advanced(state, self._diverge_data(generate, r["C"], r["C"]))
+            self._assert_no_recovery(state, missing, [{"id": "m"}], 0, "could not be resolved")
+            self.assertFalse(any(h.get("kind") == "gap" for h in state["history"]))
+
+    def test_unrelated_histories_empty_merge_base_warns_only(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="release-radar-trust-orphan-") as tmp:
+            r = self.make_trust_repo(Path(tmp) / "hermes-agent")
+            generate = self.load_generate_with_root(Path(tmp) / "runtime", Path(tmp) / "hermes-agent")
+            # baseline=orphan (no common ancestor with C); HEAD=C==origin/main (trusted)
+            state = {"baseline_commit": r["orphan"], "baseline_label": "Checkpoint orphan",
+                     "review_markers": [{"id": "m"}], "history": []}
+            generate.archive_if_head_advanced(state, self._diverge_data(generate, r["C"], r["C"]))
+            self._assert_no_recovery(state, r["orphan"], [{"id": "m"}], 0, "no common ancestor")
+
+    def test_origin_main_unavailable_warns_only(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="release-radar-trust-noupstream-") as tmp:
+            r = self.make_trust_repo(Path(tmp) / "hermes-agent")
+            generate = self.load_generate_with_root(Path(tmp) / "runtime", Path(tmp) / "hermes-agent")
+            # genuine divergence baseline=A vs HEAD=C, but origin/main cannot be resolved
+            state = {"baseline_commit": r["A"], "baseline_label": "Hermes Agent v0.14.0 (2026.5.16)",
+                     "review_markers": [{"id": "m"}], "history": []}
+            generate.archive_if_head_advanced(state, self._diverge_data(generate, r["C"], ""))
+            self._assert_no_recovery(state, r["A"], [{"id": "m"}], 0, "origin/main")
+
+    def test_verified_divergence_with_real_repo_records_gap(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="release-radar-trust-ok-") as tmp:
+            r = self.make_trust_repo(Path(tmp) / "hermes-agent")
+            generate = self.load_generate_with_root(Path(tmp) / "runtime", Path(tmp) / "hermes-agent")
+            # baseline=A diverged; HEAD=C==origin/main; merge-base=base => trusted recovery
+            state = {"baseline_commit": r["A"], "baseline_label": "Hermes Agent v0.14.0 (2026.5.16)",
+                     "review_markers": [{"id": "m"}], "history": []}
+            generate.archive_if_head_advanced(state, self._diverge_data(generate, r["C"], r["C"]))
+            self.assertEqual(len(state["history"]), 1)
+            self.assertEqual(state["history"][0].get("kind"), "gap")
+            self.assertEqual(state["history"][0]["merge_base"], r["base"])
+            self.assertEqual(state["baseline_commit"], r["C"])
+            self.assertEqual(state["review_markers"], [])
+            self.assertNotIn("checkpoint_warning", state)
+
 
 if __name__ == "__main__":
     unittest.main()
