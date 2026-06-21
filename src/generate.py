@@ -374,6 +374,19 @@ def is_ancestor(older: str, newer: str) -> bool:
     return False
 
 
+def merge_base(a: str, b: str) -> str:
+    """Return the best common ancestor of two commits, or '' if none/unreadable.
+
+    Read-only (`git merge-base`); never mutates the inspected checkout.
+    """
+    if not a or not b:
+        return ""
+    out = sh(["git", "merge-base", a, b], check=False)
+    if not out or "fatal" in out.lower():
+        return ""
+    return out.splitlines()[-1].strip()
+
+
 def rev_parse(ref: str) -> str:
     return sh(["git", "rev-parse", ref], check=False).splitlines()[-1].strip()
 
@@ -1105,8 +1118,14 @@ flushPendingToast(); activateInitialTab(); initCatToggle(); window.addEventListe
 
 def render_history(state: dict[str, Any]) -> str:
     entries = list(reversed(state.get("history", [])))
+    warn = state.get("checkpoint_warning")
+    warn_banner = (
+        f'<section class="card warn"><h2>Checkpoint warning</h2><p>{html.escape(warn)}</p>'
+        '<p class="muted">History was not auto-archived for this change. No history was deleted.</p></section>'
+        if warn else ""
+    )
     if not entries:
-        body = '<section class="card"><h2>No installed-update history yet</h2><p class="muted">After Hermes local HEAD advances beyond the stored baseline, Release Radar will archive the installed range here and reset the main page to only future upstream commits.</p></section>'
+        body = warn_banner + '<section class="card"><h2>No installed-update history yet</h2><p class="muted">After Hermes local HEAD advances beyond the stored baseline, Release Radar will archive the installed range here and reset the main page to only future upstream commits.</p></section>'
     else:
         cards = []
         for idx, h in enumerate(entries):
@@ -1117,8 +1136,13 @@ def render_history(state: dict[str, Any]) -> str:
             top_commits = "".join(f'<li><code>{html.escape(c.get("short",""))}</code> {html.escape(c.get("subject",""))}</li>' for c in h.get("commits", [])[:25])
             from_label = history_display_label(h.get('from_version', ''), h.get('old_baseline', ''))
             to_label = history_display_label(h.get('to_version', ''), h.get('new_baseline', ''))
+            if h.get("kind") == "gap":
+                mb = h.get("merge_base", "")
+                mb_html = f' · nearest common ancestor <code>{html.escape(mb[:12])}</code>' if mb else ""
+                cards.append(f'''<section class="card warn"><h2>History gap · {html.escape(from_label)} → {html.escape(to_label)}</h2><p class="muted">Recorded {html.escape(h.get('archived_at',''))} · ~{h.get('commit_count',0)} commits (approximate) · <code>{html.escape(h.get('old_baseline','')[:12])}</code> → <code>{html.escape(h.get('new_baseline','')[:12])}</code>{mb_html}</p><p>{html.escape(h.get('note',''))}</p><details open><summary>Official releases in the recovered range</summary><ul>{rel_html}</ul></details><p><b>Category mix (approximate):</b> {cat_text or 'none'}</p><details><summary>Sample commits in the recovered range</summary><ul>{top_commits}</ul></details></section>''')
+                continue
             cards.append(f'''<section class="card"><h2>{html.escape(from_label)} → {html.escape(to_label)}</h2><p class="muted">Archived {html.escape(h.get('archived_at',''))} · {h.get('commit_count',0)} installed commits · <code>{html.escape(h.get('old_baseline','')[:12])}</code> → <code>{html.escape(h.get('new_baseline','')[:12])}</code></p><details open><summary>Official releases in this installed range</summary><ul>{rel_html}</ul></details><p><b>Category mix:</b> {cat_text or 'none'}</p><details><summary>Top installed commits</summary><ul>{top_commits}</ul></details></section>''')
-        body = "\n".join(cards)
+        body = warn_banner + "\n".join(cards)
     return f'''<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>Hermes Release Radar History</title><link rel="icon" type="image/svg+xml" href="data:image/svg+xml,{FAVICON_DATA}"><style>{SHELL_CSS}</style></head><body><div class="topbar"><main class="row spread"><span class="brandwrap"><a class="brand" href="index.html" aria-label="Hermes Release Radar home">{APP_ICON_SVG}<span>Hermes Release Radar</span></a>{APP_VERSION_BADGE}</span><span class="navlinks"><a href="index.html">Current</a><a class="help-icon" href="help.html" title="Help / setup commands" aria-label="Help / setup commands">?</a></span></main></div><main><h1>Installed update history</h1><p class="muted">This is the archive of commits that became installed checkpoints. It is separate from review markers.</p>{body}</main></body></html>'''
 
 
@@ -1156,8 +1180,79 @@ def archive_if_head_advanced(state: dict[str, Any], data: dict[str, Any]) -> Non
         state["baseline_label"] = checkpoint_label_for(new_version, head)
         state["review_markers"] = []
         state["checkpoint_notice"] = f"Archived {len(commits)} installed commits into history and moved baseline to {head[:12]}."
+        state.pop("checkpoint_warning", None)
+    elif is_ancestor(head, baseline):
+        # HEAD is behind the stored baseline (a possible Hermes rollback/downgrade).
+        # Do not fabricate a range or move the baseline backwards; surface a warning.
+        state["checkpoint_warning"] = (
+            f"Current HEAD {head[:12]} is behind stored baseline {baseline[:12]} "
+            f"(possible Hermes rollback); not auto-archiving. Manual checkpoint review needed."
+        )
     else:
-        state["checkpoint_warning"] = f"Stored baseline {baseline[:12]} is not an ancestor of current HEAD {head[:12]}; not auto-archiving. Manual checkpoint review needed."
+        # Divergence: the stored baseline is no longer on HEAD's line — upstream history
+        # was rewritten (squash/rebase). Record an honest, durable gap covering what we
+        # can know, then recover the baseline so future updates archive normally again.
+        record_history_gap(state, data, baseline, head)
+
+
+def record_history_gap(state: dict[str, Any], data: dict[str, Any], baseline: str, head: str) -> None:
+    """Append a durable 'gap' history record after an upstream history rewrite.
+
+    When the stored baseline diverged from HEAD, the individual installed checkpoints
+    between them cannot be reconstructed faithfully. Instead of silently freezing
+    history (the old behavior) or inventing intermediate versions, we record one
+    clearly-labelled gap covering ``merge-base(baseline, head)..head`` — counts are
+    approximate, version labels are only used when reliably derivable — and advance
+    the baseline to HEAD so the next real update archives normally. Existing history
+    is never deleted. Read-only git inspection; the Hermes checkout is not mutated.
+    """
+    mb = merge_base(baseline, head)
+    if mb:
+        commits, cat_counts, imp_counts, _category_commits = collect_commits(f"{mb}..{head}")
+        releases = releases_between([data.get("latest_release", {})] + data.get("reachable_releases", []), mb, head)
+    else:
+        commits, cat_counts, imp_counts, releases = [], {}, {}, []
+    new_version = data.get("current_version", {})
+    # from_version: prefer the real version at the diverged baseline; fall back to the
+    # stored label only if it is valid; otherwise a neutral checkpoint. Never invented.
+    stored_label = state.get("baseline_label", "")
+    from_label = (
+        version_label_at_commit(baseline)
+        or (stored_label if is_valid_checkpoint_label(stored_label) else "")
+        or f"Checkpoint {baseline[:12]}"
+    )
+    to_label = new_version.get("raw") or version_label_at_commit(head) or f"Checkpoint {head[:12]}"
+    record = {
+        "kind": "gap",
+        "archived_at": data["generated_at"],
+        "old_baseline": baseline,
+        "new_baseline": head,
+        "merge_base": mb,
+        "from_version": from_label,
+        "to_version": to_label,
+        "commit_count": len(commits),
+        "commit_count_approximate": True,
+        "category_counts": cat_counts,
+        "importance_counts": imp_counts,
+        "releases": releases,
+        "commits": [{k: c[k] for k in ["short", "full", "date", "subject", "importance", "categories"]} for c in commits[:50]],
+        "review_markers_archived": state.get("review_markers", []),
+        "note": (
+            "Upstream history was rewritten: the previously recorded baseline is no longer an "
+            "ancestor of the current HEAD, so the individual installed checkpoints between them "
+            "were not captured. This is a recovered range from the nearest common ancestor; the "
+            "commit count is approximate and intermediate version checkpoints are not individually recorded."
+        ),
+    }
+    state.setdefault("history", []).append(record)
+    state["baseline_commit"] = head
+    state["baseline_label"] = checkpoint_label_for(new_version, head)
+    state["review_markers"] = []
+    state["checkpoint_notice"] = (
+        f"Recorded a history gap and recovered the baseline to {head[:12]} after an upstream "
+        f"history rewrite (~{len(commits)} commits in the recovered range)."
+    )
+    state.pop("checkpoint_warning", None)
 
 
 def history_display_label(label: str, commit: str) -> str:

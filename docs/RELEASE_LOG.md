@@ -4,6 +4,14 @@
 
 No unreleased changes.
 
+## 0.4.12-local - 2026-06-21
+
+- Fixed the History page silently freezing. `archive_if_head_advanced()` only archived an installed range when the stored `baseline_commit` was an ancestor of the current Hermes HEAD. When upstream rewrote history (squash/rebase), the recorded baseline stopped being an ancestor of HEAD, so every subsequent run took the "not an ancestor" branch, set a `checkpoint_warning`, and did **not** archive or advance the baseline — freezing History at the last ancestor-valid checkpoint (v0.14.0-era) even as the installed Hermes advanced to v0.15/v0.16/v0.17. The warning was never shown on the page, so the freeze was invisible.
+- On divergence, Release Radar now records a durable, clearly-labelled **history gap** record (`kind: "gap"`) covering `merge-base(baseline, HEAD)..HEAD`: the diverged old baseline, the new baseline (HEAD), the nearest common ancestor, real `from`/`to` versions only when reliably derivable (otherwise a neutral `Checkpoint <sha>` — never invented), an **approximate** commit count, official releases detected in the recovered range, and a sample of commits. It then advances the baseline to HEAD so future updates archive normally again — the gap can no longer grow silently. Existing history is never deleted.
+- Added a distinct rollback branch: when HEAD is *behind* the stored baseline (possible Hermes downgrade), Release Radar warns and does not fabricate a range or move the baseline backwards.
+- The History page now surfaces a `checkpoint_warning` banner when present and renders gap records distinctly (warn-styled, "History gap", approximate counts, explanatory note), so missed/recovered ranges are honest and visible.
+- Scope: changes are limited to installed-update history/baseline handling. The `#official` cache, `What actually matters`, `Raw categorized commits`, and review markers are unaffected. Release Radar still never runs `hermes update` and does not mutate the Hermes checkout (read-only git inspection only).
+
 ## 0.4.11-local - 2026-06-21
 
 - The `Official release notes` tab now keeps the last official release notes visible after you update Hermes. Previously, once you updated to the latest release there was no longer a newer release reachable in `HEAD..origin/main`, so the tab dropped its rich highlights/body and showed only a muted "no newer release" line, making the page feel empty between releases.
