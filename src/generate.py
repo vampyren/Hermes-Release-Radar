@@ -778,7 +778,46 @@ def render_first_run_setup(data: dict[str, Any]) -> str:
     )
 
 
-def render_official_release(data: dict[str, Any]) -> str:
+def render_official_highlights(highlights: list[dict[str, Any]] | None) -> str:
+    """Render parsed release highlights as <li> items (shared by live + cached cards)."""
+    return "".join(
+        f'<li><b>{html.escape(h.get("title", "Highlight"))}</b><br><span>{html.escape(strip_md(h.get("text", ""), 900))}</span></li>'
+        for h in (highlights or [])
+    ) or '<li>No parsed highlights in the latest GitHub release body.</li>'
+
+
+def render_cached_official_release(data: dict[str, Any], cache: dict[str, Any]) -> str:
+    """Render the cached last official release as honest, reference-only content.
+
+    Shown on #official when no newer release is reachable but a prior official
+    release was cached. It is reference content only and does not affect any
+    counts elsewhere on the page; it makes no claim about pending commits in
+    either direction (the other tabs are the source of truth for those).
+
+    Always shows the current installed version from live ``data`` — never the
+    cached ``installed_raw`` (which is only the install context at cache time).
+    """
+    cur = data.get("current_version", {})
+    behind = int(data.get("behind", 0) or 0)
+    rel_name = cache.get("name") or cache.get("tag_name") or "unknown"
+    rel_url = cache.get("html_url") or "#"
+    published = cache.get("published_at") or ""
+    published_html = f' · <b>Published:</b> {html.escape(published)}' if published else ""
+    shown = render_official_highlights(cache.get("highlights"))
+    intro = "You are up to date" if behind == 0 else "No newer official release is reachable"
+    return (
+        '<section class="card official-release cached">'
+        '<div class="row spread"><h2>Official release notes</h2><span class="pill medium">Last official release</span></div>'
+        f'<p class="muted">{intro}; showing the last official release notes for reference. This is reference content only.</p>'
+        f'<p class="version-line"><b>Installed:</b> {html.escape(cur.get("raw", "unknown"))} · <b>Last official release:</b> <a href="{html.escape(rel_url)}">{html.escape(rel_name)}</a>{published_html}</p>'
+        '<details open><summary>Release framing from GitHub</summary>'
+        f'<p>{html.escape(strip_md(cache.get("body_excerpt", ""), 1200))}</p></details>'
+        f'<ul id="officialHighlights" class="highlight-list">{shown}</ul>'
+        '</section>'
+    )
+
+
+def render_official_release(data: dict[str, Any], state: dict[str, Any] | None = None) -> str:
     if not data.get("repo_ok", True):
         return render_first_run_setup(data)
     latest = data.get("latest_release") or {}
@@ -787,6 +826,9 @@ def render_official_release(data: dict[str, Any]) -> str:
     cur = data.get("current_version", {})
     reachable = data.get("reachable_releases", []) or []
     if not reachable:
+        cache = (state or {}).get("last_official_release_notes") or {}
+        if cache:
+            return render_cached_official_release(data, cache)
         latest_name = latest.get("name") or latest.get("tag_name") or "unknown"
         latest_url = latest.get("html_url") or "#"
         return (
@@ -797,11 +839,7 @@ def render_official_release(data: dict[str, Any]) -> str:
             '</section>'
         )
     rel = reachable[0]
-    highlights = rel.get("highlights") or []
-    shown = "".join(
-        f'<li><b>{html.escape(h.get("title", "Highlight"))}</b><br><span>{html.escape(strip_md(h.get("text", ""), 900))}</span></li>'
-        for h in highlights
-    ) or '<li>No parsed highlights in the latest GitHub release body.</li>'
+    shown = render_official_highlights(rel.get("highlights"))
     rel_names = ", ".join(html.escape(r.get("name") or r.get("tag_name") or "release") for r in reachable) or "None detected between local HEAD and upstream top"
     return (
         '<section class="card official-release">'
@@ -907,7 +945,7 @@ def render_page(data: dict[str, Any], state: dict[str, Any]) -> str:
         verdict_note = "Local edits" if dirty else ("Ready" if data["behind"] else "Clean")
     today_sv = datetime.datetime.now().astimezone().strftime("%Y-%m-%d")
     release_notes = render_release_notes(data)
-    official = render_official_release(data)
+    official = render_official_release(data, state)
     refresh = data.get("new_since_refresh", {}) or {}
     new_cat_counts = refresh.get("category_counts", {}) or {}
     new_fulls = set(refresh.get("commit_fulls", []))
@@ -1207,6 +1245,34 @@ def prune_review_markers(state: dict[str, Any], data: dict[str, Any]) -> None:
         state["review_markers"] = kept
 
 
+def update_official_release_cache(state: dict[str, Any], data: dict[str, Any]) -> None:
+    """Cache the newest reachable official release for the #official tab.
+
+    Lets #official keep showing the last official release notes after Hermes is
+    updated and no newer release is reachable in HEAD..origin/main. Only writes
+    when a release is currently reachable, so a GitHub fetch error or an
+    up-to-date checkout preserves the existing cache. The stored payload is small
+    and reference-only: it never feeds behind/category counts, risk text,
+    #matters, raw commits, or history.
+    """
+    reachable = data.get("reachable_releases") or []
+    if not reachable:
+        return
+    rel = reachable[0]
+    cur = data.get("current_version") or {}
+    state["last_official_release_notes"] = {
+        "name": rel.get("name", ""),
+        "tag_name": rel.get("tag_name", ""),
+        "html_url": rel.get("html_url", ""),
+        "published_at": rel.get("published_at", ""),
+        "body_excerpt": rel.get("body_excerpt", ""),
+        "highlights": rel.get("highlights", []),
+        "commit": rel.get("commit", ""),
+        "installed_raw": cur.get("raw", ""),
+        "cached_at": data.get("generated_at", ""),
+    }
+
+
 def main():
     ROOT.mkdir(parents=True, exist_ok=True)
     RUNS.mkdir(parents=True, exist_ok=True)
@@ -1217,6 +1283,7 @@ def main():
     archive_if_head_advanced(state, data)
     prune_review_markers(state, data)
     migrate_history_version_labels(state, data)
+    update_official_release_cache(state, data)
     state["last_generated_at"] = data["generated_at"]
     state["last_refresh_highlights"] = data.get("new_since_refresh", {})
     state["last_version_output"] = data.get("version_output", "")
